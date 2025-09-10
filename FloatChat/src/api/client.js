@@ -10,5 +10,6 @@ async function fetchJson(url) {
 }
 
 export function fetchFloats() { return fetchJson(`${API_URL}/floats`); }
+export function fetchFloatDetails(floatId) { return fetchJson(`${API_URL}/floats/${floatId}`); }
 export function fetchProfiles(floatId) { return fetchJson(`${API_URL}/floats/${floatId}/profiles`); }
 export function fetchMeasurements(profileId) { return fetchJson(`${API_URL}/profiles/${profileId}/measurements`); }
