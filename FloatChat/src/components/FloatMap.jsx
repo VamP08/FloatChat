@@ -43,6 +43,7 @@ export default function FloatMap({ locations }) {
             position={[float.latitude, float.longitude]}
             eventHandlers={{
               click: () => {
+                console.log(`Marker clicked! Setting selectedFloat to: ${float.id}`);
                 setFloat(float.id);
               },
             }}
