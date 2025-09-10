@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Dashboard from './pages/Dashboard';
-import MapView from './pages/MapView'; // <-- UNCOMMENT THIS
+import MapView from './pages/MapView'; 
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
