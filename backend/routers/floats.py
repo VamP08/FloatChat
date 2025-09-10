@@ -24,3 +24,8 @@ def read_float(float_id: str, db: Session = Depends(database.get_db)):
 @router.get("/{float_id}/profiles", response_model=List[schemas.ProfileBase])
 def read_profiles(float_id: str, db: Session = Depends(database.get_db)):
     return crud.get_profiles_by_float(db, float_id=float_id)
+
+@router.get("/{float_id}/trajectory", response_model=List[schemas.ProfileBase])
+def read_float_trajectory(float_id: str, db: Session = Depends(database.get_db)):
+    """Gets all profiles for a float, to be used for drawing its path."""
+    return crud.get_profiles_by_float(db, float_id=float_id)
