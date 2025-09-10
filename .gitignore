@@ -11,3 +11,6 @@ venv/
 env/
 .env/
 
+databse
+argo_data.sqlite
+
