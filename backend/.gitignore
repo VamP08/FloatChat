@@ -1,0 +1,16 @@
+Python
+Ignore all pycache directories
+pycache/
+
+Ignore Python compiled files
+*.pyc
+
+Ignore virtual environment directories
+venv/
+.venv/
+env/
+.env/
+
+databse
+argo_data.sqlite
+

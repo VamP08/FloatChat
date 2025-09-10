@@ -1,21 +1,32 @@
-// src/App.jsx
-import { Routes, Route, Link } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
+import { useState } from 'react';
+import Dashboard from './pages/Dashboard';
+// MapView will be created in a future step
+// import MapView from './pages/MapView';
 
 export default function App() {
-  return (
-    <>
-      <nav className="p-2 bg-gray-800 text-white flex gap-4">
-        <Link to="/">Dashboard</Link>
-        <Link to="/chat">Chat</Link>
-        <Link to="/map">Map</Link>
-      </nav>
+  const [activeView, setActiveView] = useState('dashboard');
 
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/chat" element={<div>Chat Page</div>} />
-        <Route path="/map" element={<div>Map Page</div>} />
-      </Routes>
-    </>
+  const navClass = (viewName) =>
+    `px-4 py-2 cursor-pointer rounded-t-lg font-medium transition-colors ${
+      activeView === viewName
+        ? 'bg-white text-blue-600'
+        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+    }`;
+
+  return (
+    <div className="flex flex-col h-screen font-sans bg-gray-100">
+      <nav className="flex px-4 pt-2 bg-gray-100 border-b border-gray-200">
+        <div onClick={() => setActiveView('dashboard')} className={navClass('dashboard')}>
+          Dashboard
+        </div>
+        <div onClick={() => setActiveView('map')} className={navClass('map')}>
+          Map
+        </div>
+      </nav>
+      <main className="flex-grow bg-white shadow-inner-lg rounded-b-lg overflow-hidden">
+        {activeView === 'dashboard' && <Dashboard />}
+        {/* {activeView === 'map' && <p className="p-4">Map View coming soon!</p>} */}
+      </main>
+    </div>
   );
 }
