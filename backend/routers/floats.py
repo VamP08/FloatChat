@@ -9,6 +9,11 @@ router = APIRouter(prefix="/floats", tags=["floats"])
 def read_floats(skip: int = 0, limit: int = 1000, db: Session = Depends(database.get_db)):
     return crud.get_floats(db, skip=skip, limit=limit)
 
+@router.get("/locations", response_model=List[schemas.FloatLocation]) # <-- CHANGE THIS
+def read_all_float_locations(db: Session = Depends(database.get_db)):
+    """Endpoint to get the latest known location of all floats."""
+    return crud.get_all_float_locations(db)
+
 @router.get("/{float_id}", response_model=schemas.FloatChatBase)
 def read_float(float_id: str, db: Session = Depends(database.get_db)):
     db_float = crud.get_float_by_id(db, float_id=float_id)
