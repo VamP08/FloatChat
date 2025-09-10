@@ -1,6 +1,16 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+class FloatLocation(BaseModel):
+    id: str
+    project_name: str
+    latitude: float
+    longitude: float
+    profile_date: str
+
+    class Config:
+        from_attributes = True
+        
 class MeasurementBase(BaseModel):
     pressure: float
     temp: Optional[float]

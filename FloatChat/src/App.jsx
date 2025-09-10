@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Dashboard from './pages/Dashboard';
-// MapView will be created in a future step
-// import MapView from './pages/MapView';
+import MapView from './pages/MapView'; // <-- UNCOMMENT THIS
 
 export default function App() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -25,7 +24,7 @@ export default function App() {
       </nav>
       <main className="flex-grow bg-white shadow-inner-lg rounded-b-lg overflow-hidden">
         {activeView === 'dashboard' && <Dashboard />}
-        {/* {activeView === 'map' && <p className="p-4">Map View coming soon!</p>} */}
+        {activeView === 'map' && <MapView />} {}
       </main>
     </div>
   );
