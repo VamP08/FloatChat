@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import floats, profiles
+from .routers import floats, profiles, chat
 
 app = FastAPI(title="Argo Dashboard API")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Your Vite dev server
+    allow_origins=["http://localhost:5173"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -16,6 +16,7 @@ app.add_middleware(
 # Include your routers in the main application
 app.include_router(floats.router)
 app.include_router(profiles.router)
+app.include_router(chat.router)
 
 @app.get("/")
 def root():
