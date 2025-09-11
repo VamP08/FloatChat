@@ -13,7 +13,7 @@ export default function App() {
     }`;
 
   return (
-    <div className="flex flex-col h-screen font-sans bg-gray-100">
+  <div className="flex flex-col h-screen min-h-0 font-sans bg-gray-100 overflow-hidden">
       <nav className="flex px-4 pt-2 bg-gray-100 border-b border-gray-200">
         <div onClick={() => setActiveView('dashboard')} className={navClass('dashboard')}>
           Dashboard
@@ -22,7 +22,7 @@ export default function App() {
           Map
         </div>
       </nav>
-      <main className="flex-grow bg-white shadow-inner-lg rounded-b-lg overflow-hidden">
+  <main className="flex-grow min-h-0 bg-white shadow-inner-lg rounded-b-lg overflow-hidden">
         {activeView === 'dashboard' && <Dashboard />}
         {activeView === 'map' && <MapView />} {}
       </main>

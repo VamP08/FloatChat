@@ -11,6 +11,8 @@ const PARAMETER_CONFIG = {
   doxy: { name: 'Oxygen', unit: 'μmol/kg' },
   chla: { name: 'Chlorophyll-a', unit: 'mg/m³' },
   nitrate: { name: 'Nitrate', unit: 'μmol/kg' },
+  bbp700: { name: 'Backscatter 700nm', unit: 'm⁻¹' },
+  ph: { name: 'pH', unit: '' },
 };
 
 // Sub-component for selecting parameters

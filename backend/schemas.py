@@ -22,7 +22,7 @@ class MeasurementBase(BaseModel):
     ph: Optional[float]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ProfileBase(BaseModel):
@@ -33,7 +33,7 @@ class ProfileBase(BaseModel):
     longitude: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class FloatChatBase(BaseModel):
@@ -43,4 +43,4 @@ class FloatChatBase(BaseModel):
     sensors_list: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
