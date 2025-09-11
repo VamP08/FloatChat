@@ -1,30 +1,63 @@
-import { useState } from 'react';
-import Dashboard from './pages/Dashboard';
-import MapView from './pages/MapView'; 
+import { useState, useEffect, useMemo } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import MapView from './pages/MapView';
+import Header from './components/Header';
+import { fetchActiveFloatLocations } from './api/client';
+import FloatListPage from './pages/FloatListPage';
+import ChatPage from './pages/ChatPage';
 
 export default function App() {
-  const [activeView, setActiveView] = useState('dashboard');
+  const [isNavVisible, setIsNavVisible] = useState(false);
+  const [allLocations, setAllLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [flyToTarget, setFlyToTarget] = useState(null);
 
-  const navClass = (viewName) =>
-    `px-4 py-2 cursor-pointer rounded-t-lg font-medium transition-colors ${
-      activeView === viewName
-        ? 'bg-white text-blue-600'
-        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-    }`;
+  useEffect(() => {
+    setLoading(true);
+    fetchActiveFloatLocations()
+      .then(setAllLocations)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+   const filteredLocations = useMemo(() => {
+    const trimmedSearch = searchTerm.trim();
+    if (!trimmedSearch) return allLocations;
+    return allLocations.filter(loc => loc.id.toString().includes(trimmedSearch));
+  }, [allLocations, searchTerm]);
+
+  useEffect(() => {
+    if (filteredLocations.length === 1) {
+      setFlyToTarget(filteredLocations[0]);
+    } else {
+      setFlyToTarget(null);
+    }
+  }, [filteredLocations]);
+
 
   return (
-  <div className="flex flex-col h-screen min-h-0 font-sans bg-gray-100 overflow-hidden">
-      <nav className="flex px-4 pt-2 bg-gray-100 border-b border-gray-200">
-        <div onClick={() => setActiveView('dashboard')} className={navClass('dashboard')}>
-          Dashboard
-        </div>
-        <div onClick={() => setActiveView('map')} className={navClass('map')}>
-          Map
-        </div>
-      </nav>
-  <main className="flex-grow min-h-0 bg-white shadow-inner-lg rounded-b-lg overflow-hidden">
-        {activeView === 'dashboard' && <Dashboard />}
-        {activeView === 'map' && <MapView />} {}
+    <div className="h-screen w-screen relative bg-white">
+      <Header
+        isNavVisible={isNavVisible}
+        setIsNavVisible={setIsNavVisible}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        resultCount={filteredLocations.length}
+      />
+      <main className="h-full w-full">
+        <Routes>
+          <Route path="/" element={
+            <MapView
+              locations={filteredLocations}
+              loading={loading}
+              searchTerm={searchTerm}
+              flyToTarget={flyToTarget}
+            />
+          } />
+          <Route path="/list" element={<FloatListPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+        </Routes>
       </main>
     </div>
   );
