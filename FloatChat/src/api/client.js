@@ -32,3 +32,22 @@ export function fetchProfilesWithData(floatId) { return fetchJson(`${API_URL}/fl
 
 // For getting the initial locations of ONLY ACTIVE floats for the map
 export function fetchActiveFloatLocations() { return fetchJson(`${API_URL}/floats/locations/active`); }
+
+// This is the new function for the chat
+export async function sendChatMessage(history) {
+  const res = await fetch(`${API_URL}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    // The body must be a JSON string
+    body: JSON.stringify({ history }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+
+  return res.json();
+}
