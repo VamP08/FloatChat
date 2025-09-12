@@ -51,3 +51,15 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     history: List[ChatMessage]
+
+class TimeSeriesData(BaseModel):
+    profile_date: str
+    pressure: float
+    temp: Optional[float]
+    psal: Optional[float]
+    doxy: Optional[float]
+    chla: Optional[float]
+    nitrate: Optional[float]
+
+    class Config:
+        from_attributes = True
