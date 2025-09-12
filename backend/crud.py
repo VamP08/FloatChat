@@ -121,3 +121,24 @@ def get_locations_for_active_floats(db: Session):
         .all()
     )
     return results
+
+def get_full_timeseries_by_float(db: Session, float_id: str):
+    """
+    Gets all measurements for all profiles of a single float, joining
+    the profile date for time-series analysis.
+    """
+    return (
+        db.query(
+            models.Profile.profile_date,
+            models.Measurement.pressure,
+            models.Measurement.temp,
+            models.Measurement.psal,
+            models.Measurement.doxy,
+            models.Measurement.chla,
+            models.Measurement.nitrate
+        )
+        .join(models.Measurement, models.Measurement.profile_id == models.Profile.id)
+        .filter(models.Profile.float_id == float_id)
+        .order_by(models.Profile.profile_date)
+        .all()
+    )

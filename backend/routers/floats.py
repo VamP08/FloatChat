@@ -50,3 +50,11 @@ def read_profiles_with_data(float_id: str, db: Session = Depends(database.get_db
 def read_float_trajectory(float_id: str, db: Session = Depends(database.get_db)):
     """Gets all profiles for a float, to be used for drawing its path."""
     return crud.get_profiles_by_float(db, float_id=float_id)
+
+@router.get("/{float_id}/timeseries", response_model=List[schemas.TimeSeriesData])
+def read_float_timeseries(float_id: str, db: Session = Depends(database.get_db)):
+    """
+    Gets the complete measurement history for a single float for
+    time-series plotting.
+    """
+    return crud.get_full_timeseries_by_float(db, float_id=float_id)

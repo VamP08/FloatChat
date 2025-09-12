@@ -51,3 +51,6 @@ export async function sendChatMessage(history) {
 
   return res.json();
 }
+
+// For getting the new time-series data for a whole float
+export function fetchFloatTimeSeries(floatId) { return fetchJson(`${API_URL}/floats/${floatId}/timeseries`); }
