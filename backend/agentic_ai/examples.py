@@ -23,7 +23,7 @@ async def run_examples():
         "Are there any unusual trends in Bay of Bengal in the last year?",
         "Show me the maximum salinity values in the Arabian Sea during 2023",
         "Compare average temperatures between Bay of Bengal and Arabian Sea",
-        "What's the oxygen concentration at 500m depth in the North Pacific?",
+        "What's the oxygen concentration at 500 decibar pressure in the North Pacific?",
         "Detect temperature anomalies in the Arabian Sea",
         "Show me recent temperature profiles in the Southern Ocean",
     ]
@@ -90,7 +90,7 @@ def test_parameter_extraction():
         "What is the average temperature in the Bay of Bengal last year?",
         "Are there any unusual oxygen trends in Arabian Sea?",
         "Compare salinity between North Pacific and Indian Ocean in 2023",
-        "Show temperature profiles at 100m depth",
+        "Show temperature profiles at 100 decibar pressure",
     ]
     
     for query in test_queries:

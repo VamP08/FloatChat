@@ -44,7 +44,7 @@ class OceanQueryFunctions:
                     'depth_range': types.Schema(
                         type=types.Type.ARRAY,
                         items=types.Schema(type=types.Type.NUMBER),
-                        description='Depth range [min, max] in meters, or single depth value',
+                        description='Depth range [min, max] in pressure (decibar). Note: 1 decibar ≈ 1 meter depth. Pressure values represent ocean depth.',
                     ),
                     'operation': types.Schema(
                         type=types.Type.STRING,
@@ -103,7 +103,7 @@ class OceanQueryFunctions:
                     'depth_range': types.Schema(
                         type=types.Type.ARRAY,
                         items=types.Schema(type=types.Type.NUMBER),
-                        description='Depth range [min, max] in meters, or single depth value',
+                        description='Depth range [min, max] in pressure (decibar). Note: 1 decibar ≈ 1 meter depth. Pressure values represent ocean depth.',
                     ),
                     'operation': types.Schema(
                         type=types.Type.STRING,

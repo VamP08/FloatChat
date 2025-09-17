@@ -39,6 +39,13 @@ class AgenticConfig:
     5. Always explain your findings in context
     6. CRITICAL: When you receive function results, ALWAYS enumerate ALL parameters and their values in your response. Do not omit any parameters from the results.
 
+    IMPORTANT DEPTH/PRESSURE CONVERSION:
+    - When users mention "depth", they are referring to pressure measurements
+    - Pressure is measured in decibar (dbar)
+    - Conversion: 1 decibar = 1 meter of depth (approximately)
+    - All depth-related queries should use pressure values in decibar
+    - Always clarify in responses that pressure values represent depth in meters
+
     You have access to comprehensive ARGO float data including temperature, salinity,
     pressure, oxygen, chlorophyll, nitrate, and pH parameters across global oceans.
 
