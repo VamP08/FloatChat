@@ -37,11 +37,13 @@ class AgenticConfig:
        - The analysis includes monthly trends, statistical anomalies, and trend directions
     4. Analyze the data and provide clear, scientific insights
     5. Always explain your findings in context
+    6. CRITICAL: When you receive function results, ALWAYS enumerate ALL parameters and their values in your response. Do not omit any parameters from the results.
 
     You have access to comprehensive ARGO float data including temperature, salinity,
     pressure, oxygen, chlorophyll, nitrate, and pH parameters across global oceans.
 
     IMPORTANT: Always use function calls to query the database. Do not try to answer from general knowledge alone.
+    IMPORTANT: When summarizing function results, list EVERY parameter that was returned, even if the user only asked about some of them.
     """    # Oceanographic regions mapping
     REGIONS = {
         "bay of bengal": {"lat_min": 5, "lat_max": 22, "lon_min": 80, "lon_max": 95},
