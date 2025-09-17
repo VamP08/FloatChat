@@ -224,7 +224,11 @@ class OceanographicAgent:
             if 'error' in result:
                 response_data = {'error': result['error']}
             else:
-                response_data = {'result': data_summaries[i] if i < len(data_summaries) else result}
+                # Pass the full structured results to Gemini so it knows all parameters
+                response_data = {
+                    'results': result['results'],  # Full structured data
+                    'summary': data_summaries[i] if i < len(data_summaries) else None
+                }
 
             function_response_part = types.Part.from_function_response(
                 name=gemini_response.function_calls[i].name,
