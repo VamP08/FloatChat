@@ -68,7 +68,12 @@ class SQLTemplateEngine:
         return "p.profile_date BETWEEN ? AND ?", [start_date, end_date]
     
     def _build_depth_filter(self, depth_range: Optional[List[float]]) -> tuple:
-        """Build depth filtering conditions"""
+        """Build depth filtering conditions
+        
+        Note: Depth values are stored as pressure in decibar in the database.
+        Conversion: 1 decibar ≈ 1 meter of depth.
+        The 'depth_range' parameter represents pressure values in decibar.
+        """
         if not depth_range:
             return "", []
         

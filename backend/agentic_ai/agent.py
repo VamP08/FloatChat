@@ -432,6 +432,9 @@ class OceanographicAgent:
             response += f"\nRegion: {params['region'].title()}"
         if params.get('date_range'):
             response += f"\nTime period: {params['date_range'][0]} to {params['date_range'][1]}"
+        if params.get('depth_range'):
+            depth_min, depth_max = params['depth_range'][0], params['depth_range'][-1]
+            response += f"\nDepth range: {depth_min}-{depth_max} decibar (≈{depth_min}-{depth_max} meters)"
         
         return response
     
@@ -471,6 +474,12 @@ class OceanographicAgent:
                     response += "\n"
             
             response += "This analysis examines monthly patterns and statistical deviations from normal conditions."
+            
+            # Add depth context if applicable
+            if params.get('depth_range'):
+                depth_min, depth_max = params['depth_range'][0], params['depth_range'][-1]
+                response += f"\n\nNote: Analysis performed at {depth_min}-{depth_max} decibar pressure (≈{depth_min}-{depth_max} meters depth)."
+            
             return response
         
         # Fallback to old format for backward compatibility
@@ -488,6 +497,11 @@ class OceanographicAgent:
             response += f"  Period: {result['first_anomaly']} to {result['last_anomaly']}\n\n"
         
         response += "These anomalies exceed the statistical threshold and may indicate significant oceanographic events or changes."
+        
+        # Add depth context if applicable
+        if params.get('depth_range'):
+            depth_min, depth_max = params['depth_range'][0], params['depth_range'][-1]
+            response += f"\n\nNote: Analysis performed at {depth_min}-{depth_max} decibar pressure (≈{depth_min}-{depth_max} meters depth)."
         
         return response
     
