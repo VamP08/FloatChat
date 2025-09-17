@@ -510,6 +510,92 @@ class SQLTemplateEngine:
         
         return results
     
+    def query_time_series_data(self, **kwargs) -> List[Dict[str, Any]]:
+        """Query time series data for visualization"""
+        regions = kwargs.get('regions', [])
+        parameters = kwargs.get('parameters', [])
+        date_range = kwargs.get('date_range')
+        
+        if not regions or not parameters:
+            return []
+        
+        # Build filters
+        spatial_filters = []
+        spatial_params = []
+        
+        for region in regions:
+            spatial_filter, spatial_param = self._build_spatial_filter(
+                None, None, region
+            )
+            if spatial_filter:
+                spatial_filters.append(f"({spatial_filter})")
+                spatial_params.extend(spatial_param)
+        
+        spatial_where = " OR ".join(spatial_filters) if spatial_filters else "1=1"
+        
+        temporal_filter, temporal_params = self._build_temporal_filter(date_range)
+        temporal_where = temporal_filter if temporal_filter else "1=1"
+        
+        # Build parameter columns
+        param_mapping = {
+            'temperature': 'temp',
+            'salinity': 'psal',
+            'oxygen': 'doxy',
+            'chlorophyll': 'chla',
+            'nitrate': 'nitrate',
+            'ph': 'ph',
+            'bbp700': 'bbp700'
+        }
+        
+        param_columns = []
+        for param in parameters:
+            param_norm = param_mapping.get(param, param)
+            param_columns.append(f"AVG(m.{param_norm}) as {param}")
+        
+        columns_str = ", ".join(param_columns)
+        
+        # Group by month for time series
+        sql = f"""
+        SELECT 
+            strftime('%Y-%m', p.profile_date) as month,
+            COUNT(DISTINCT p.id) as profile_count,
+            {columns_str}
+        FROM profiles p 
+        JOIN measurements m ON p.id = m.profile_id
+        WHERE ({spatial_where}) AND ({temporal_where})
+        GROUP BY strftime('%Y-%m', p.profile_date)
+        ORDER BY month
+        """
+        
+        all_params = spatial_params + temporal_params
+        
+        results = []
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, all_params)
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                month = row[0]
+                profile_count = row[1]
+                
+                # Create a date in the middle of the month for plotting
+                year, month_num = month.split('-')
+                mid_date = f"{year}-{month_num}-15"
+                
+                result = {
+                    'profile_date': mid_date,
+                    'month': month,
+                    'profile_count': profile_count
+                }
+                
+                # Add parameter values
+                for i, param in enumerate(parameters):
+                    result[param] = row[i + 2] if row[i + 2] is not None else None
+                
+                results.append(result)
+        
+        return results
+    
     def compare_oceanographic_data(self, **kwargs) -> List[Dict[str, Any]]:
         """Compare data across regions, time periods, or parameters"""
         comparison_type = kwargs.get('comparison_type', 'regional')

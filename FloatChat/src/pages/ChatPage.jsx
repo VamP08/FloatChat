@@ -3,14 +3,18 @@ import { FiSend } from 'react-icons/fi';
 import FloatMap from '../components/FloatMap';
 // 1. Import the new chat API function
 import { fetchActiveFloatLocations, sendChatMessage } from '../api/client';
+// 2. Import the ChatVisualization component
+import ChatVisualization from '../components/ChatVisualization';
 
-const Message = ({ sender, text }) => {
+const Message = ({ sender, text, visualization }) => {
   const isUser = sender === 'user';
   return (
     <div className={`flex ${isUser ? 'justify-end' : ''}`}>
       <div className={`${isUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-800'} p-3 rounded-lg max-w-md`}>
         {!isUser && <p className="font-semibold text-sm mb-1">FloatChat AI</p>}
-        <p className="text-sm">{text}</p>
+        <p className="text-sm whitespace-pre-line">{text}</p>
+        {/* Display visualization if available */}
+        {visualization && <ChatVisualization visualization={visualization} />}
       </div>
     </div>
   );
@@ -59,11 +63,12 @@ export default function ChatPage() {
     // 3. Call the real backend endpoint instead of setTimeout
     try {
       const aiResponse = await sendChatMessage(apiHistory);
-      // The backend returns { role: 'ai', content: '...' }
+      // The backend returns { role: 'ai', content: '...', visualization: {...} }
       const newAiMessage = {
         id: Date.now() + 1,
         sender: 'ai',
         text: aiResponse.content,
+        visualization: aiResponse.visualization, // Include visualization data
       };
       setMessages(prev => [...prev, newAiMessage]);
     } catch (error) {
@@ -71,7 +76,8 @@ export default function ChatPage() {
       const errorMessage = {
         id: Date.now() + 1,
         sender: 'ai',
-        text: "Sorry, I'm having trouble connecting to my brain. Please check the server and try again."
+        text: "Sorry, I'm having trouble connecting to my brain. Please check the server and try again.",
+        visualization: null,
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -90,10 +96,10 @@ export default function ChatPage() {
   // The rest of your component's JSX remains exactly the same...
   return (
     <div className="h-full flex">
-      <div className="w-full md:w-1/2 lg:w-1/3 h-full flex flex-col border-r bg-white">
+      <div className="w-full lg:w-2/3 h-full flex flex-col border-r bg-white">
         <div className="flex-grow p-4 overflow-y-auto">
           <div className="space-y-4">
-            {messages.map(msg => <Message key={msg.id} sender={msg.sender} text={msg.text} />)}
+            {messages.map(msg => <Message key={msg.id} sender={msg.sender} text={msg.text} visualization={msg.visualization} />)}
             {isLoading && (
               <div className="flex"><div className="bg-gray-100 p-3 rounded-lg"><p className="text-sm text-gray-500 animate-pulse">FloatChat AI is thinking...</p></div></div>
             )}
@@ -122,7 +128,7 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-      <div className="hidden md:block flex-grow h-full">
+      <div className="hidden lg:block flex-grow h-full">
         {loadingMap ? (
           <div className="h-full flex items-center justify-center"><p>Loading map...</p></div>
         ) : (

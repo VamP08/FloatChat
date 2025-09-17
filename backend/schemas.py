@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class FloatLocation(BaseModel):
     id: str
@@ -45,9 +45,16 @@ class FloatChatBase(BaseModel):
     class Config:
         from_attributes = True
 
+class VisualizationData(BaseModel):
+    chart_type: str  # 'line', 'scatter', 'bar', 'comparison'
+    title: str
+    data: List[Dict[str, Any]]
+    parameters: Dict[str, Any]  # Chart configuration like x_axis, y_axis, etc.
+
 class ChatMessage(BaseModel):
     role: str 
     content: str
+    visualization: Optional[VisualizationData] = None
 
 class ChatRequest(BaseModel):
     history: List[ChatMessage]
