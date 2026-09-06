@@ -1,0 +1,229 @@
+/*
+ * FloatChat's visual world.
+ *
+ * The governing idea: light is data. A mark emits only where a reading survived
+ * quality control, so darkness on this page is the missing record, not styling.
+ * Two rules follow and are enforced throughout:
+ *
+ *   1. Data marks emit. Text never does. Glow is reserved for values, which keeps
+ *      every string at full opacity and full contrast.
+ *   2. Elevation is not emission. Panels that sit above the page use a shadow with
+ *      real offset and blur; the zero-offset halo belongs to the plankton alone.
+ *
+ * The seven parameter colours are the emission peaks of real marine organisms,
+ * roughly 460nm to 700nm, rather than a chart library's categorical ramp.
+ */
+
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@600,500&f[]=switzer@400,500,600&display=swap");
+
+:root {
+  /* The sea, by depth. Bioluminescence is a deep-water phenomenon, so surfaces
+     that represent greater depth are darker, and the page darkens as you descend. */
+  --sea-abyss: #03070c;
+  --sea-deep: #060d14;
+  --sea-panel: #0a141d;
+  --sea-raised: #101c27;
+  --sea-edge: #1b2b38;
+
+  --ink: #e8f1f5;
+  --ink-dim: #93a8b4;
+  --ink-faint: #6d8194;
+
+  /* Emission spectrum. Each is a real organism's light, assigned to the parameter
+     it reads best against its neighbours. */
+  --em-temp: #ff6b57; /* ~700nm, the far-red of Malacosteus */
+  --em-psal: #ffc94a; /* ~570nm */
+  --em-doxy: #2ee8ff; /* ~490nm, cyan */
+  --em-chla: #7cff63; /* ~510nm */
+  --em-nitrate: #5b8cff; /* ~470nm */
+  --em-bbp700: #c7a4ff; /* ~460nm, shifted violet */
+  --em-ph: #ff7bd5;
+
+  /* Reserved for controls, and deliberately not one of the seven. */
+  --action: #3dffc0;
+  --em-primary: var(--action);
+
+  --font-display: "Clash Display", ui-sans-serif, system-ui, sans-serif;
+  --font-text: "Switzer", ui-sans-serif, system-ui, sans-serif;
+
+  /* Elevation: offset and blur, never a halo. */
+  --lift-1: 0 2px 8px rgb(0 0 0 / 0.5);
+  --lift-2: 0 12px 32px -8px rgb(0 0 0 / 0.7);
+
+  color-scheme: dark;
+}
+
+html {
+  background: var(--sea-abyss);
+}
+
+body {
+  margin: 0;
+  background: var(--sea-abyss);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Measurements are the subject, so every numeral is tabular and never reflows
+   its column when a value changes. */
+.tnum,
+table,
+input,
+output {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* --- Browser surfaces -----------------------------------------------------
+   The parts not drawn by hand still belong to the design. */
+
+::selection {
+  background: color-mix(in srgb, var(--em-primary) 32%, transparent);
+  color: #ffffff;
+}
+
+::placeholder {
+  color: var(--ink-faint);
+  opacity: 1;
+}
+
+:where(input, textarea) {
+  caret-color: var(--em-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--em-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sea-edge) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--sea-edge);
+  border: 2px solid var(--sea-abyss);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--em-primary) 45%, var(--sea-edge));
+}
+
+/* --- Type ---------------------------------------------------------------- */
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+
+/* Micro labels sit in the interface's own voice: small, tracked, never a kicker
+   introducing a heading. */
+.micro {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.measure {
+  max-width: 68ch;
+}
+
+/* --- Emission -------------------------------------------------------------
+   Applied to data marks only. Text keeps its own colour and full opacity. */
+
+.emit {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 55%, transparent))
+    drop-shadow(0 0 18px color-mix(in srgb, currentColor 30%, transparent));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Leaflet ---------------------------------------------------------------
+   The map ships its own light-mode furniture. These bring it into the world. */
+
+.leaflet-container {
+  background: var(--sea-abyss);
+  font-family: var(--font-text);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--sea-panel);
+  color: var(--ink);
+  border: 1px solid var(--sea-edge);
+  box-shadow: var(--lift-2);
+  border-radius: 3px;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.leaflet-popup-close-button {
+  color: var(--ink-faint) !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: var(--ink) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(3, 7, 12, 0.82) !important;
+  color: var(--ink-faint) !important;
+  font-size: 0.625rem;
+}
+
+.leaflet-control-attribution a {
+  color: var(--ink-dim) !important;
+}
+
+/* Clusters count floats, so they are a value and may emit. */
+.float-cluster {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(8, 22, 30, 0.85);
+  border: 1px solid color-mix(in srgb, var(--action) 55%, transparent);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--action) 22%, transparent);
+}
+
+/* The basemap is context, not subject. Esri's dark canvas renders land lighter than
+   water, which on an ocean product puts every continent in front of the thing being
+   measured. Pushing the tiles down lets the sea read as the stage and leaves all the
+   colour on the floats. Only the tile pane is affected; markers and paths sit in
+   their own panes above it. */
+.leaflet-tile-pane {
+  filter: brightness(0.55) saturate(0.55) contrast(1.05);
+}

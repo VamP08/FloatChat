@@ -1,24 +1,103 @@
 """
 SQL Template Engine for Oceanographic Queries
+
+The language model never writes SQL. It chooses one of a fixed set of functions and
+supplies typed arguments; every statement executed here is assembled from templates in
+this file, with user-supplied values bound as parameters rather than interpolated.
 """
-import sqlite3
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 import json
 import numpy as np
+from sqlalchemy import create_engine, text
 from .config import AgenticConfig
+
+class UnsupportedRegion(ValueError):
+    """Raised when a query names a region the database does not cover."""
+
+    def __init__(self, region: str):
+        self.region = region
+        supported = ", ".join(sorted(AgenticConfig.REGIONS))
+        super().__init__(
+            f"No data for '{region}'. This database covers the northern Indian Ocean "
+            f"only: {supported}."
+        )
+
 
 class SQLTemplateEngine:
     """Deterministic SQL template engine for oceanographic data queries"""
-    
-    def __init__(self, db_path: str):
-        self.db_path = db_path
+
+    def __init__(self, db_url: str):
+        self.db_url = db_url
+        self.engine = create_engine(db_url, pool_pre_ping=True)
+        self.is_postgres = self.engine.dialect.name == "postgresql"
         self.config = AgenticConfig()
-    
+
     def _get_connection(self):
-        """Get database connection"""
-        return sqlite3.connect(self.db_path)
-    
+        """Open a connection. Templates below use '?' placeholders; see _execute."""
+        return self.engine.connect()
+
+    @staticmethod
+    def _bind(sql: str, params: List[Any]):
+        """Translate the '?' placeholders in a template into named bind parameters.
+
+        The templates were written against SQLite's qmark style. Rather than rewrite
+        every one, they are translated once here so the same template runs on both
+        SQLite and Postgres, and values stay bound rather than interpolated.
+        """
+        bound = {}
+        pieces = sql.split("?")
+        if len(pieces) - 1 != len(params):
+            raise ValueError(
+                f"template expects {len(pieces) - 1} parameters, got {len(params)}"
+            )
+        rebuilt = pieces[0]
+        for index, piece in enumerate(pieces[1:]):
+            key = f"p{index}"
+            bound[key] = params[index]
+            rebuilt += f":{key}" + piece
+        return text(rebuilt), bound
+
+    def _execute(self, conn, sql: str, params: List[Any]):
+        """Run a template and return every row. Rows support integer indexing."""
+        statement, bound = self._bind(sql, params)
+        return conn.execute(statement, bound).fetchall()
+
+    def _execute_one(self, conn, sql: str, params: List[Any]):
+        """Run a template and return the first row, or None."""
+        statement, bound = self._bind(sql, params)
+        return conn.execute(statement, bound).fetchone()
+
+    # -- dialect differences ------------------------------------------------------
+    # Two functions are spelled differently in SQLite and Postgres. Everything else in
+    # this file is standard SQL, so these are the only places the target matters.
+
+    def _round(self, expression: str, digits: int) -> str:
+        """ROUND on a floating-point column needs an explicit cast in Postgres."""
+        if self.is_postgres:
+            return f"ROUND(({expression})::numeric, {digits})"
+        return f"ROUND({expression}, {digits})"
+
+    def _stddev(self, expression: str) -> str:
+        """Population standard deviation in a single pass over the rows.
+
+        Postgres has STDDEV_POP; SQLite has no aggregate for it, so the identity
+        sqrt(E[x^2] - E[x]^2) is used there instead.
+        """
+        if self.is_postgres:
+            return f"STDDEV_POP({expression})"
+        return (
+            f"SQRT(MAX(AVG({expression} * {expression}) - "
+            f"AVG({expression}) * AVG({expression}), 0))"
+        )
+
+    def _string_agg(self, expression: str, order_by: str) -> str:
+        """Concatenate a column into one delimited string, in a defined order."""
+        if self.is_postgres:
+            return f"STRING_AGG({expression}, ',' ORDER BY {order_by})"
+        return f"GROUP_CONCAT({expression})"
+
+
     def _parse_date_range(self, date_range: List[str]) -> tuple:
         """Parse and validate date range"""
         if len(date_range) == 2:
@@ -40,9 +119,12 @@ class SQLTemplateEngine:
         
         if region:
             region_bounds = self.config.get_region_bounds(region)
-            if region_bounds:
-                lat_bounds = [region_bounds['lat_min'], region_bounds['lat_max']]
-                lon_bounds = [region_bounds['lon_min'], region_bounds['lon_max']]
+            if not region_bounds:
+                # Dropping an unknown region would answer a question about the Pacific
+                # with measurements from the Indian Ocean. Refuse instead.
+                raise UnsupportedRegion(region)
+            lat_bounds = [region_bounds['lat_min'], region_bounds['lat_max']]
+            lon_bounds = [region_bounds['lon_min'], region_bounds['lon_max']]
         
         if lat_bounds and len(lat_bounds) == 2:
             conditions.append("p.latitude BETWEEN ? AND ?")
@@ -162,21 +244,14 @@ class SQLTemplateEngine:
                 
                 # Build SQL query with JOIN between profiles and measurements
                 if operation.lower() in ['std', 'standard_deviation']:
-                    # For standard deviation, need subquery
                     sql = f"""
-                    WITH avg_data AS (
-                        SELECT AVG(m.{param_norm}) as avg_val 
-                        FROM profiles p 
-                        JOIN measurements m ON p.id = m.profile_id
-                        WHERE {where_clause} AND m.{param_norm} IS NOT NULL
-                    )
-                    SELECT 
+                    SELECT
                         '{param}' as parameter,
-                        SQRT(AVG((m.{param_norm} - avg_val) * (m.{param_norm} - avg_val))) as value,
+                        {self._stddev(f'm.{param_norm}')} as value,
                         COUNT(m.{param_norm}) as count,
                         '{operation}' as operation
-                    FROM profiles p 
-                    JOIN measurements m ON p.id = m.profile_id, avg_data
+                    FROM profiles p
+                    JOIN measurements m ON p.id = m.profile_id
                     WHERE {where_clause} AND m.{param_norm} IS NOT NULL
                     """
                 else:
@@ -191,9 +266,8 @@ class SQLTemplateEngine:
                     WHERE {where_clause} AND m.{param_norm} IS NOT NULL
                     """
                 
-                cursor = conn.execute(sql, all_params)
-                row = cursor.fetchone()
-                
+                row = self._execute_one(conn, sql, all_params)
+
                 if row and row[1] is not None:
                     results.append({
                         'parameter': row[0],
@@ -288,10 +362,14 @@ class SQLTemplateEngine:
                 param_norm = param_mapping.get(param, param)
 
                 # Enhanced anomaly detection with multiple methods
+                monthly_series = self._string_agg(
+                    "month || ':' || " + self._round('avg_value', 3) + " || '(' || status || ')'",
+                    order_by='month',
+                )
                 sql = f"""
                 WITH monthly_stats AS (
                     SELECT
-                        strftime('%Y-%m', p.profile_date) as month,
+                        p.year_month as month,
                         AVG(m.{param_norm}) as avg_value,
                         MIN(m.{param_norm}) as min_value,
                         MAX(m.{param_norm}) as max_value,
@@ -299,7 +377,7 @@ class SQLTemplateEngine:
                     FROM profiles p
                     JOIN measurements m ON p.id = m.profile_id
                     WHERE {where_clause} AND m.{param_norm} IS NOT NULL
-                    GROUP BY strftime('%Y-%m', p.profile_date)
+                    GROUP BY p.year_month
                     ORDER BY month
                 ),
                 overall_stats AS (
@@ -342,13 +420,11 @@ class SQLTemplateEngine:
                     period_max,
                     variability_ratio,
                     (SELECT COUNT(*) FROM anomalies WHERE status = 'ANOMALY') as anomaly_count,
-                    (SELECT GROUP_CONCAT(month || ':' || ROUND(avg_value, 3) || '(' || status || ')')
-                     FROM anomalies ORDER BY month) as monthly_data
+                    (SELECT {monthly_series} FROM anomalies) as monthly_data
                 FROM trend_analysis
                 """
 
-                cursor = conn.execute(sql, all_params)
-                row = cursor.fetchone()
+                row = self._execute_one(conn, sql, all_params)
 
                 if row and row[2] and row[2] > 0:  # total_months > 0
                     # Parse monthly data for better analysis
@@ -498,15 +574,10 @@ class SQLTemplateEngine:
         
         results = []
         with self._get_connection() as conn:
-            cursor = conn.execute(sql, all_params)
-            rows = cursor.fetchall()
-            
-            # Get column names
-            col_names = [desc[0] for desc in cursor.description]
-            
+            rows = self._execute(conn, sql, all_params)
+
             for row in rows:
-                profile_data = dict(zip(col_names, row))
-                results.append(profile_data)
+                results.append(dict(row._mapping))
         
         return results
     
@@ -557,13 +628,13 @@ class SQLTemplateEngine:
         # Group by month for time series
         sql = f"""
         SELECT 
-            strftime('%Y-%m', p.profile_date) as month,
+            p.year_month as month,
             COUNT(DISTINCT p.id) as profile_count,
             {columns_str}
         FROM profiles p 
         JOIN measurements m ON p.id = m.profile_id
         WHERE ({spatial_where}) AND ({temporal_where})
-        GROUP BY strftime('%Y-%m', p.profile_date)
+        GROUP BY p.year_month
         ORDER BY month
         """
         
@@ -571,8 +642,7 @@ class SQLTemplateEngine:
         
         results = []
         with self._get_connection() as conn:
-            cursor = conn.execute(sql, all_params)
-            rows = cursor.fetchall()
+            rows = self._execute(conn, sql, all_params)
             
             for row in rows:
                 month = row[0]
@@ -687,8 +757,7 @@ class SQLTemplateEngine:
             WHERE {where_clause}
             """
             
-            cursor = conn.execute(summary_sql, all_params)
-            row = cursor.fetchone()
+            row = self._execute_one(conn, summary_sql, all_params)
             
             summary = {
                 'total_profiles': row[0],
@@ -712,11 +781,12 @@ class SQLTemplateEngine:
                 'pressure': 'pressure'
             }
             
-            for param in self.config.PARAMETERS[:8]:  # Check main parameters
-                param_norm = param_mapping.get(param, param)
+            # Iterate over the database columns themselves; the config's PARAMETERS
+            # list holds every synonym a person might type, not column names.
+            for param in self.config.PARAMETER_SYNONYMS:
+                param_norm = param
                 param_sql = f"SELECT COUNT(*) FROM profiles p JOIN measurements m ON p.id = m.profile_id WHERE {where_clause} AND m.{param_norm} IS NOT NULL"
-                cursor = conn.execute(param_sql, all_params)
-                count = cursor.fetchone()[0]
+                count = self._execute_one(conn, param_sql, all_params)[0]
                 if count > 0:
                     summary['available_parameters'].append({
                         'parameter': param,

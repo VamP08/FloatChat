@@ -1,16 +1,40 @@
-Python
-Ignore all pycache directories
-pycache/
-
-Ignore Python compiled files
-*.pyc
-
-Ignore virtual environment directories
-venv/
+# Python
+__pycache__/
+*.py[cod]
 .venv/
+venv/
 env/
-.env/
-*.env*
-databse
-argo_data.sqlite
 
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Downloaded Argo NetCDF files, rebuilt by ingest.py on demand
+.argo-cache/
+
+# Databases: the small demo database under data/ is committed, everything else is not
+*.sqlite
+*.sqlite-journal
+!data/argo_demo.sqlite
+
+# Engineering notes are kept outside this repository
+/docs/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local tooling configuration
+.impeccable/
+.playwright-mcp/
+
+# Impeccable product/design records are engineering notes, kept in the private docs repo
+PRODUCT.md
+DESIGN.md

@@ -27,10 +27,10 @@ class OceanographicAgent:
     for natural language oceanographic data queries
     """
     
-    def __init__(self, db_path: str, api_key: Optional[str] = None):
-        self.db_path = db_path
+    def __init__(self, db_url: str, api_key: Optional[str] = None):
+        self.db_url = db_url
         self.config = AgenticConfig()
-        self.sql_engine = SQLTemplateEngine(db_path)
+        self.sql_engine = SQLTemplateEngine(db_url)
         
         # Initialize Gemini client if available
         if GENAI_AVAILABLE and (api_key or self.config.GEMINI_API_KEY):

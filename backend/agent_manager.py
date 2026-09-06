@@ -1,48 +1,39 @@
-"""
-Agent instance management for the FloatChat backend
-"""
-from typing import Optional, Any
-from pathlib import Path
-import os
+"""Holds the single natural-language agent instance used by the chat endpoint."""
 
-# Import agentic AI
+from typing import Any, Optional
+
+from .database import DATABASE_URL
+
 try:
     from .agentic_ai.agent import OceanographicAgent
-    AGENTIC_AI_AVAILABLE = True
-except ImportError:
-    print("Agentic AI not available. Install dependencies with: pip install -r agentic_ai/requirements.txt")
-    AGENTIC_AI_AVAILABLE = False
+
+    AGENT_IMPORTABLE = True
+except ImportError as error:  # google-genai is optional; the API still serves data without it
+    print(f"Natural-language agent unavailable: {error}")
+    AGENT_IMPORTABLE = False
     OceanographicAgent = None
 
-# Global agent instance
 agent_instance: Optional[Any] = None
 
+
 def initialize_agent() -> Optional[Any]:
-    """
-    Initialize the agentic AI agent
-    """
+    """Build the agent once at startup. Returns None if it cannot be configured."""
     global agent_instance
 
-    if not AGENTIC_AI_AVAILABLE or agent_instance is not None:
+    if not AGENT_IMPORTABLE or agent_instance is not None:
         return agent_instance
 
     try:
-        # Get database path
-        project_root = Path(__file__).parent.parent
-        db_path = os.path.join(project_root, "argo_data.sqlite")
-
-        # Initialize agent
-        agent_instance = OceanographicAgent(db_path=db_path)
-        print("🤖 Agentic AI agent initialized successfully")
-        print(f"   - Gemini Available: {agent_instance.gemini_available}")
-        print(f"   - Database: {db_path}")
+        agent_instance = OceanographicAgent(db_url=DATABASE_URL)
+        print(
+            "Natural-language agent ready "
+            f"(language model configured: {agent_instance.gemini_available})"
+        )
         return agent_instance
-    except Exception as e:
-        print(f"❌ Failed to initialize agentic AI: {e}")
+    except Exception as error:
+        print(f"Failed to initialise the natural-language agent: {error}")
         return None
 
+
 def get_agent() -> Optional[Any]:
-    """
-    Get the initialized agent instance
-    """
     return agent_instance

@@ -19,7 +19,7 @@ class OceanQueryFunctions:
                 properties={
                     'region': types.Schema(
                         type=types.Type.STRING,
-                        description='Geographic region (e.g., Bay of Bengal, Arabian Sea, North Pacific)',
+                        description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.',
                     ),
                     'lat_bounds': types.Schema(
                         type=types.Type.ARRAY,
@@ -78,7 +78,7 @@ class OceanQueryFunctions:
                 properties={
                     'region': types.Schema(
                         type=types.Type.STRING,
-                        description='Geographic region (e.g., Bay of Bengal, Arabian Sea, North Pacific)',
+                        description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.',
                     ),
                     'lat_bounds': types.Schema(
                         type=types.Type.ARRAY,
@@ -127,7 +127,7 @@ class OceanQueryFunctions:
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
-                    'region': types.Schema(type=types.Type.STRING, description='Geographic region to analyze'),
+                    'region': types.Schema(type=types.Type.STRING, description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.'),
                     'parameters': types.Schema(
                         type=types.Type.ARRAY,
                         items=types.Schema(type=types.Type.STRING),
@@ -202,7 +202,7 @@ class OceanQueryFunctions:
                     'regions': types.Schema(
                         type=types.Type.ARRAY,
                         items=types.Schema(type=types.Type.STRING),
-                        description='List of regions to compare',
+                        description='Two regions to compare, from: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean',
                     ),
                     'time_periods': types.Schema(
                         type=types.Type.ARRAY,

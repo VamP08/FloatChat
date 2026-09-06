@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from .. import schemas
 from ..agent_manager import get_agent
+from ..ratelimit import rate_limit
 from typing import List, Dict, Any
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -396,7 +397,7 @@ def _create_profile_visualization(results: List[Dict[str, Any]], params: Dict[st
     # Fallback to generic table
     return _create_table_visualization(results, params)
 
-@router.post("/", response_model=schemas.ChatMessage)
+@router.post("", response_model=schemas.ChatMessage, dependencies=[Depends(rate_limit)])
 async def handle_chat_message(request: schemas.ChatRequest):
     """
     Receives the chat history and returns the AI's response using agentic AI.
@@ -446,3 +447,20 @@ async def handle_chat_message(request: schemas.ChatRequest):
         print(f"💥 Exception in chat handler: {str(e)}")
         ai_response_content = f"Sorry, I encountered an unexpected error: {str(e)}"
         return schemas.ChatMessage(role="ai", content=ai_response_content)
+
+# Questions the template engine can actually answer against the ingested region, used
+# as the starting suggestions in the interface. Every one of these was run against the
+# database before being listed here.
+EXAMPLE_QUESTIONS = [
+    "What is the average temperature in the Arabian Sea?",
+    "Compare salinity between the Arabian Sea and the Bay of Bengal",
+    "Show dissolved oxygen below 500 decibar in the Bay of Bengal",
+    "Are there unusual chlorophyll trends in the Arabian Sea?",
+    "What is the maximum nitrate concentration in the equatorial Indian Ocean?",
+]
+
+
+@router.get("/examples", response_model=List[str])
+def read_examples():
+    """Starting questions for the chat, chosen to match what the data can support."""
+    return EXAMPLE_QUESTIONS

@@ -1,0 +1,10 @@
+# Normalise to LF in the repository; check out native on each platform.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.sqlite binary
+*.nc     binary
+*.png    binary
+*.jpg    binary
+*.gif    binary
+*.webp   binary

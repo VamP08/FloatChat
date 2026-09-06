@@ -1,72 +1,91 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from datetime import date
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class FloatLocation(BaseModel):
+    """One map marker: where a float last surfaced."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
-    project_name: str
+    project_name: Optional[str] = None
     latitude: float
     longitude: float
-    profile_date: str
+    profile_date: date
 
-    class Config:
-        from_attributes = True
-        
+
 class MeasurementBase(BaseModel):
-    pressure: float
-    temp: Optional[float]
-    psal: Optional[float]
-    doxy: Optional[float]
-    chla: Optional[float]
-    nitrate: Optional[float]
-    bbp700: Optional[float]
-    ph: Optional[float]
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+    pressure: float
+    temp: Optional[float] = None
+    psal: Optional[float] = None
+    doxy: Optional[float] = None
+    chla: Optional[float] = None
+    nitrate: Optional[float] = None
+    bbp700: Optional[float] = None
+    ph: Optional[float] = None
 
 
 class ProfileBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     cycle_number: int
-    profile_date: str
+    profile_date: date
     latitude: float
     longitude: float
 
-    class Config:
-        from_attributes = True
 
+class FloatDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-class FloatChatBase(BaseModel):
     id: str
-    project_name: str
-    wmo_inst_type: str
-    sensors_list: str
+    project_name: Optional[str] = None
+    platform_type: Optional[str] = None
+    wmo_inst_type: Optional[str] = None
+    pi_name: Optional[str] = None
+    data_centre: Optional[str] = None
+    sensors_list: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+
+class ParameterCoverageBase(BaseModel):
+    """How much usable data a float holds for one parameter."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    parameter: str
+    n_values: int
+    first_date: date
+    last_date: date
+
+
+class TimeSeriesData(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    profile_date: date
+    pressure: float
+    temp: Optional[float] = None
+    psal: Optional[float] = None
+    doxy: Optional[float] = None
+    chla: Optional[float] = None
+    nitrate: Optional[float] = None
+
 
 class VisualizationData(BaseModel):
-    chart_type: str  # 'line', 'scatter', 'bar', 'comparison'
+    chart_type: str  # line, scatter, bar, table
     title: str
     data: List[Dict[str, Any]]
-    parameters: Dict[str, Any]  # Chart configuration like x_axis, y_axis, etc.
+    parameters: Dict[str, Any]  # axis names and grouping for the chart to render
+
 
 class ChatMessage(BaseModel):
-    role: str 
+    role: str
     content: str
     visualization: Optional[VisualizationData] = None
 
+
 class ChatRequest(BaseModel):
     history: List[ChatMessage]
-
-class TimeSeriesData(BaseModel):
-    profile_date: str
-    pressure: float
-    temp: Optional[float]
-    psal: Optional[float]
-    doxy: Optional[float]
-    chla: Optional[float]
-    nitrate: Optional[float]
-
-    class Config:
-        from_attributes = True
