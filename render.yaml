@@ -1,0 +1,30 @@
+# Render blueprint for the API. The frontend deploys separately on Vercel.
+#
+# The service is not kept awake: one workspace gets 750 free instance-hours a month
+# across every free service, and exceeding that suspends all of them. A cold start is
+# roughly 30-60 seconds, which the interface announces rather than hides.
+
+services:
+  - type: web
+    name: floatchat-api
+    runtime: python
+    plan: free
+    region: singapore
+    healthCheckPath: /healthz
+    # requirements.txt deliberately excludes xarray and netCDF4: only ingest.py needs
+    # the NetCDF stack, and building it here would add minutes to every deploy.
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      # Postgres connection string. Without it the API falls back to the small SQLite
+      # committed under data/, which holds 8 floats rather than 83.
+      - key: DATABASE_URL
+        sync: false
+      # Google AI Studio key. The data endpoints work without it; only the chat needs it.
+      - key: GEMINI_API_KEY
+        sync: false
+      # The deployed frontend's origin, comma separated.
+      - key: CORS_ORIGINS
+        sync: false

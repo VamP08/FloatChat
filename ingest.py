@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import gzip
+import json
 import io
 import os
 import sys
@@ -25,7 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
-from sqlalchemy import create_engine, insert
+from sqlalchemy import create_engine, insert, text
 from sqlalchemy.orm import Session
 
 from backend.models import ArgoFloat, Base, Measurement, ParameterCoverage, Profile
@@ -410,6 +411,100 @@ def write_float(session: Session, extracted: dict) -> int:
     return written
 
 
+# --------------------------------------------------------------------------------------
+# Landing-page dataset
+# --------------------------------------------------------------------------------------
+
+TRACKS_PATH = Path("frontend") / "src" / "data" / "tracks.json"
+BGC_PARAMETERS = ("doxy", "chla", "nitrate", "bbp700", "ph")
+
+
+def emit_tracks(engine, destination: Path = TRACKS_PATH) -> dict:
+    """Write the drift paths and totals the landing page draws.
+
+    This runs as the last step of every build so the marketing surface cannot claim
+    more than the database it sits in front of. The landing page reads it statically,
+    which is also what lets that page render while the API is still waking up.
+    """
+    with Session(engine) as session:
+        rows = session.execute(
+            text(
+                "SELECT p.float_id, f.project_name, p.latitude, p.longitude, p.profile_date "
+                "FROM profiles p JOIN floats f ON f.id = p.float_id "
+                "ORDER BY p.float_id, p.cycle_number"
+            )
+        ).all()
+
+        dominant: dict[str, str] = {}
+        for float_id, parameter in session.execute(
+            text(
+                "SELECT float_id, parameter FROM parameter_coverage "
+                "ORDER BY n_values DESC"
+            )
+        ):
+            if parameter in BGC_PARAMETERS and float_id not in dominant:
+                dominant[float_id] = parameter
+
+        totals = session.execute(
+            text("SELECT COUNT(*) FROM profiles")
+        ).scalar_one(), session.execute(
+            text("SELECT COUNT(*) FROM measurements")
+        ).scalar_one()
+
+        per_parameter = {
+            parameter: int(total)
+            for parameter, total in session.execute(
+                text(
+                    "SELECT parameter, SUM(n_values) FROM parameter_coverage "
+                    "GROUP BY parameter"
+                )
+            )
+        }
+
+    grouped: dict[str, dict] = {}
+    for float_id, project, latitude, longitude, observed in rows:
+        entry = grouped.setdefault(float_id, {"project": project, "path": []})
+        entry["path"].append((round(longitude, 3), round(latitude, 3), str(observed)))
+
+    tracks = []
+    for float_id, entry in grouped.items():
+        path = entry["path"]
+        # The hero draws these a few hundred pixels wide, so more than ~80 points per
+        # float is detail nobody can see and payload nobody should pay for.
+        step = max(1, len(path) // 80)
+        kept = path[::step]
+        if kept[-1] != path[-1]:
+            kept.append(path[-1])
+        tracks.append(
+            {
+                "id": float_id,
+                "project": entry["project"],
+                "first": path[0][2],
+                "last": path[-1][2],
+                "cycles": len(path),
+                "bgc": dominant.get(float_id),
+                "pts": [[point[0], point[1]] for point in kept],
+            }
+        )
+
+    tracks.sort(key=lambda track: -track["cycles"])
+    payload = {
+        "stats": {
+            "floats": len(tracks),
+            "profiles": int(totals[0]),
+            "measurements": int(totals[1]),
+            "first": min(track["first"] for track in tracks),
+            "last": max(track["last"] for track in tracks),
+            "parameters": per_parameter,
+        },
+        "tracks": tracks,
+    }
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    return payload["stats"]
+
+
 def build(args: argparse.Namespace) -> None:
     cache = Path(args.cache_dir)
     engine = create_engine(args.dsn)
@@ -466,6 +561,12 @@ def build(args: argparse.Namespace) -> None:
             f"note: {len(bgc_empty)} floats carry BGC sensors whose readings do not pass "
             f"QC and were stored with those columns empty: {', '.join(bgc_empty)}"
         )
+
+    stats = emit_tracks(engine)
+    print(
+        f"wrote {TRACKS_PATH} for the landing page: {stats['floats']} floats, "
+        f"{stats['measurements']} measurements, {stats['first']} to {stats['last']}"
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -555,10 +656,20 @@ def main(argv: list[str] | None = None) -> int:
         help="build the small committed database: 8 floats, standard levels",
     )
     parser.add_argument("--self-check", action="store_true", help="run assertions and exit")
+    parser.add_argument(
+        "--tracks-only",
+        action="store_true",
+        help="rewrite the landing page dataset from an existing database and exit",
+    )
     args = parser.parse_args(argv)
 
     if args.self_check:
         self_check()
+        return 0
+
+    if args.tracks_only:
+        stats = emit_tracks(create_engine(args.dsn))
+        print(json.dumps(stats, indent=2))
         return 0
 
     if args.demo:
