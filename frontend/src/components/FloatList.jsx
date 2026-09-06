@@ -16,10 +16,9 @@ const EMISSION = {
 // so a row can say something concrete without a second request per float.
 const RECORD = new Map(trackData.tracks.map((track) => [track.id, track]));
 
-export default function FloatList() {
+export default function FloatList({ onSelect, filterTerm = "" }) {
   const [floats, setFloats] = useState([]);
   const [error, setError] = useState(null);
-  const setFloat = useAppStore((s) => s.setFloat);
   const selectedFloat = useAppStore((s) => s.selectedFloat);
 
   useEffect(() => {
@@ -34,13 +33,10 @@ export default function FloatList() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="sticky top-0 z-10 border-b border-[var(--sea-edge)] bg-[var(--sea-deep)] px-4 py-3">
-        <h2 className="micro">
-          {floats.length ? `${floats.length} floats` : "Floats"}
-        </h2>
-      </div>
       <ul className="p-2">
-        {floats.map((float) => {
+        {floats
+          .filter((float) => float.id.toString().includes(filterTerm.trim()))
+          .map((float) => {
           const record = RECORD.get(float.id);
           const colour = EMISSION[record?.bgc] ?? "#687e8f";
           const isSelected = float.id === selectedFloat;
@@ -48,7 +44,7 @@ export default function FloatList() {
             <li key={float.id}>
               <button
                 type="button"
-                onClick={() => setFloat(float.id)}
+                onClick={() => onSelect(float.id)}
                 className={`flex w-full items-baseline gap-3 rounded-sm px-2.5 py-2.5 text-left
                             transition-colors ${
                               isSelected

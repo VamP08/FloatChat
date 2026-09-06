@@ -12,9 +12,9 @@ const year = (iso) => iso.slice(0, 4);
 const UNLIT = trackData.tracks.filter((track) => track.bgc == null);
 
 const ENTRANCES = [
-  { href: "/map", title: "The map", body: "Every float where it last surfaced. Follow one to see its path and read its dives." },
-  { href: "/list", title: "The floats", body: "All 83, with the project that deployed them and the sensors they carry." },
-  { href: "/chat", title: "Ask", body: "A question in plain English, answered with the chart behind the number." },
+  { href: "/floats", title: "The map", body: "Every float where it last surfaced. Choose one to follow its drift." },
+  { href: "/floats", title: "The floats", body: "All 83, each one a page: where it went, what it measured, every dive it made." },
+  { href: "/floats?ask=1", title: "Ask", body: "A question in plain English, answered with the chart behind the number." },
 ];
 
 export default function Landing() {
@@ -46,9 +46,9 @@ export default function Landing() {
           <header className="pointer-events-auto flex items-center justify-between">
             <span className="display text-xl tracking-tight">FloatChat</span>
             <nav className="flex gap-7 text-sm text-[var(--ink-dim)]">
-              <a className="transition-colors hover:text-[var(--ink)]" href="/map">Map</a>
-              <a className="transition-colors hover:text-[var(--ink)]" href="/list">Floats</a>
-              <a className="transition-colors hover:text-[var(--ink)]" href="/chat">Ask</a>
+              <a className="transition-colors hover:text-[var(--ink)]" href="/floats">Map</a>
+              <a className="transition-colors hover:text-[var(--ink)]" href="/floats">Floats</a>
+              <a className="transition-colors hover:text-[var(--ink)]" href="/floats?ask=1">Ask</a>
             </nav>
           </header>
 
@@ -227,7 +227,7 @@ export default function Landing() {
       <section className="border-t border-[var(--sea-edge)] px-6 py-24 sm:px-10 lg:px-16">
         <ul>
           {ENTRANCES.map((entry) => (
-            <li key={entry.href}>
+            <li key={entry.title}>
               <a
                 href={entry.href}
                 className="group flex flex-col gap-3 border-b border-[var(--sea-edge)] py-8

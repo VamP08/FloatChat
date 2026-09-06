@@ -32,8 +32,7 @@ function clusterIcon(cluster) {
   });
 }
 
-export default function FloatMap({ locations, searchTerm, flyToTarget }) {
-  const setFloat = useAppStore((s) => s.setFloat);
+export default function FloatMap({ locations, searchTerm, flyToTarget, onSelect }) {
   const selectedFloat = useAppStore((s) => s.selectedFloat);
   const mapRef = useRef(null);
 
@@ -81,7 +80,7 @@ export default function FloatMap({ locations, searchTerm, flyToTarget }) {
                 fillColor: colour,
                 fillOpacity: parameter ? 0.5 : 0.2,
               }}
-              eventHandlers={{ click: () => setFloat(float.id) }}
+              eventHandlers={{ click: () => onSelect?.(float.id) }}
             >
               <Popup>
                 <span className="block font-semibold text-[var(--ink)]">Float {float.id}</span>

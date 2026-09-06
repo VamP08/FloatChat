@@ -35,11 +35,13 @@ export const axisProps = {
   tickLine: { stroke: EDGE },
 };
 
+// Axis labels carry units, so they are never uppercased: doing so turns the micro sign
+// in "µmol/kg" into a Greek capital Mu, which reads as MMOL/KG — a thousandfold error
+// on a page whose whole claim is that the numbers are right.
 export const labelStyle = {
   fill: INK_DIM,
   fontSize: 11,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
+  letterSpacing: "0.06em",
 };
 
 export const tooltipProps = {
