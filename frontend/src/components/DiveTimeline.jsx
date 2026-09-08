@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 /**
  * A float's dives as ticks along its own lifetime.
@@ -7,8 +7,15 @@ import { useMemo } from 'react';
  * for a float with 382 dives told you nothing about the shape of its record. As ticks on
  * a real time axis, the gaps where a float went quiet and the stretches where it
  * reported steadily are both visible at a glance.
+ *
+ * The ticks themselves are not controls. Dives cluster, so at 382 dives across nine
+ * hundred pixels a per-tick hit box either misses its own mark or covers its neighbour,
+ * and it puts 382 stops in the tab order on the way to the next section. The track is
+ * one control instead: a click takes the nearest dive, and the arrow keys walk them.
  */
 export default function DiveTimeline({ dives, selectedId, onSelect }) {
+  const trackRef = useRef(null);
+
   const { ticks, firstYear, lastYear } = useMemo(() => {
     if (!dives.length) return { ticks: [], firstYear: null, lastYear: null };
     const times = dives.map((dive) => new Date(dive.profile_date).getTime());
@@ -27,6 +34,32 @@ export default function DiveTimeline({ dives, selectedId, onSelect }) {
 
   if (!dives.length) return null;
 
+  const index = Math.max(0, dives.findIndex((dive) => dive.id === selectedId));
+  const selected = dives[index];
+  const dateOf = (dive) => new Date(dive.profile_date).toLocaleDateString();
+
+  function pickNearest(event) {
+    const box = trackRef.current?.getBoundingClientRect();
+    if (!box) return;
+    const percent = ((event.clientX - box.left) / box.width) * 100;
+    let best = 0;
+    ticks.forEach((tick, i) => {
+      if (Math.abs(tick.left - percent) < Math.abs(ticks[best].left - percent)) best = i;
+    });
+    onSelect(dives[best].id);
+  }
+
+  function onKeyDown(event) {
+    const step = {
+      ArrowLeft: -1, ArrowRight: 1,
+      PageUp: -10, PageDown: 10,
+      Home: -dives.length, End: dives.length,
+    }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    onSelect(dives[Math.min(dives.length - 1, Math.max(0, index + step))].id);
+  }
+
   return (
     <div>
       <div className="flex items-baseline justify-between">
@@ -36,31 +69,35 @@ export default function DiveTimeline({ dives, selectedId, onSelect }) {
         </p>
       </div>
 
-      <div className="relative mt-4 h-14">
-        <div className="absolute inset-x-0 top-7 h-px bg-[var(--sea-edge)]" />
-        {ticks.map(({ dive, left }) => {
-          const isSelected = dive.id === selectedId;
-          return (
-            <button
-              key={dive.id}
-              type="button"
-              onClick={() => onSelect(dive.id)}
-              title={`Cycle ${dive.cycle_number} · ${new Date(dive.profile_date).toLocaleDateString()}`}
-              aria-label={`Dive ${dive.cycle_number} on ${new Date(dive.profile_date).toLocaleDateString()}`}
-              aria-pressed={isSelected}
-              className="absolute top-0 h-14 w-6 -translate-x-1/2 cursor-pointer bg-transparent"
-              style={{ left: `${left}%` }}
-            >
-              <span
-                className={`block w-px transition-all ${
-                  isSelected
-                    ? 'emit mx-auto h-14 bg-[var(--action)]'
-                    : 'mx-auto h-6 translate-y-4 bg-[var(--ink-faint)] hover:h-10 hover:translate-y-2 hover:bg-[var(--ink)]'
-                }`}
-              />
-            </button>
-          );
-        })}
+      <div
+        ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label="Dive"
+        aria-valuemin={1}
+        aria-valuemax={dives.length}
+        aria-valuenow={index + 1}
+        aria-valuetext={`Dive ${selected.cycle_number} on ${dateOf(selected)}`}
+        onPointerDown={pickNearest}
+        onKeyDown={onKeyDown}
+        title={`Dive ${selected.cycle_number} · ${dateOf(selected)}`}
+        className="relative mt-4 h-14 cursor-pointer outline-none
+                   ring-offset-4 ring-offset-[var(--sea-abyss)]
+                   focus-visible:ring-1 focus-visible:ring-[var(--action)]"
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-7 h-px bg-[var(--sea-edge)]" />
+        {ticks.map(({ dive, left }) => (
+          <span
+            key={dive.id}
+            aria-hidden="true"
+            style={{ left: `${left}%` }}
+            className={`pointer-events-none absolute block w-px -translate-x-1/2 ${
+              dive.id === selected.id
+                ? 'emit top-0 h-14 bg-[var(--action)]'
+                : 'top-4 h-6 bg-[var(--ink-faint)]'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
