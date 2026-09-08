@@ -109,6 +109,12 @@ Every build drops and recreates the schema. `--demo` therefore always writes the
 file and never inherits `DATABASE_URL`, and rebuilding a non-SQLite database that already
 holds measurements requires `--replace`.
 
+**Load through the direct endpoint, not the pooled one.** Neon offers both; the pooled
+host has `-pooler` in its name and exists to multiplex short-lived serverless connections,
+which is what the deployed API wants. A bulk load through it measured 673 rows/s against
+1,468 on the direct host, because the pooler does not pipeline. Drop `-pooler` from the
+host for the ingest and keep it for `DATABASE_URL` on Render.
+
 `ingest.py` reads the Argo GDAC's synthetic-profile index, selects floats inside a
 bounding box, downloads one `_meta.nc` and one `_Sprof.nc` per float, applies the quality
 control above, bins the profiles, and writes to Postgres or SQLite. Downloads are cached
