@@ -14,9 +14,6 @@ import json
 from typing import Dict, List, Any, Optional
 from datetime import date, timedelta, datetime
 import asyncio
-from dotenv import load_dotenv
-
-load_dotenv()
 
 try:
     from groq import Groq

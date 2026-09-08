@@ -505,9 +505,39 @@ def emit_tracks(engine, destination: Path = TRACKS_PATH) -> dict:
     return payload["stats"]
 
 
+def _confirm_replace(engine, dsn: str, assume_yes: bool) -> None:
+    """Refuse to wipe a non-local database without being told to.
+
+    Every build drops and recreates the schema. Against a local file that is free; against
+    the hosted database it is the whole dataset, and the flag that gets it back is a
+    forty-minute download. So a remote target has to be named on the command line.
+    """
+    if engine.dialect.name == "sqlite" or assume_yes:
+        return
+
+    existing = 0
+    try:
+        with engine.connect() as connection:
+            existing = connection.execute(
+                text("SELECT COUNT(*) FROM measurements")
+            ).scalar_one()
+    except Exception:
+        return  # No schema yet, so there is nothing to lose.
+
+    if existing:
+        # Show the database, never the credentials in front of it.
+        target = dsn.rsplit("@", 1)[-1] if "@" in dsn else dsn
+        raise SystemExit(
+            f"Refusing to continue: {target} already holds {existing:,} measurements, and "
+            f"this rebuild drops every table first.\n"
+            f"Re-run with --replace if that is what you want."
+        )
+
+
 def build(args: argparse.Namespace) -> None:
     cache = Path(args.cache_dir)
     engine = create_engine(args.dsn)
+    _confirm_replace(engine, args.dsn, args.replace)
 
     print(f"reading the synthetic-profile index for {args.region}")
     candidates = select_floats(
@@ -561,6 +591,16 @@ def build(args: argparse.Namespace) -> None:
             f"note: {len(bgc_empty)} floats carry BGC sensors whose readings do not pass "
             f"QC and were stored with those columns empty: {', '.join(bgc_empty)}"
         )
+
+    if getattr(args, "demo", False):
+        # The demo database is a local convenience; the landing page ships the deployed
+        # dataset. Rewriting tracks.json here would quietly cut the published page down
+        # to eight floats the next time it was committed.
+        print(
+            f"skipped {TRACKS_PATH}: this is the demo build. Regenerate it against the "
+            f"deployed database with --tracks-only."
+        )
+        return
 
     stats = emit_tracks(engine)
     print(
@@ -636,7 +676,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dsn",
-        default=os.getenv("DATABASE_URL", "sqlite:///argo_data.sqlite"),
+        default=None,
         help="SQLAlchemy database URL (default: $DATABASE_URL, else local SQLite)",
     )
     parser.add_argument("--region", choices=sorted(REGIONS), default="north-indian")
@@ -657,6 +697,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--self-check", action="store_true", help="run assertions and exit")
     parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="allow rebuilding a non-SQLite database that already holds measurements",
+    )
+    parser.add_argument(
         "--tracks-only",
         action="store_true",
         help="rewrite the landing page dataset from an existing database and exit",
@@ -668,16 +713,27 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.tracks_only:
-        stats = emit_tracks(create_engine(args.dsn))
+        stats = emit_tracks(
+            create_engine(args.dsn or os.getenv("DATABASE_URL", "sqlite:///argo_data.sqlite"))
+        )
         print(json.dumps(stats, indent=2))
         return 0
+
+    explicit_dsn = args.dsn is not None
 
     if args.demo:
         args.max_floats = 8
         args.resolution = "standard"
-        if args.dsn == "sqlite:///argo_data.sqlite":
+        if not explicit_dsn:
+            # Never inherit $DATABASE_URL here. Once that points at the production
+            # database, a command named --demo would drop every table in it and reload
+            # eight floats. The demo build writes a local file unless --dsn says
+            # otherwise in so many words.
             Path("data").mkdir(exist_ok=True)
             args.dsn = "sqlite:///data/argo_demo.sqlite"
+
+    if args.dsn is None:
+        args.dsn = os.getenv("DATABASE_URL", "sqlite:///argo_data.sqlite")
 
     build(args)
     return 0

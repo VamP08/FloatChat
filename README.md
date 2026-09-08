@@ -105,14 +105,19 @@ python ingest.py --demo              # 8 floats  -> data/argo_demo.sqlite
 python ingest.py --dsn <postgres-url>   # all 83  -> Postgres
 ```
 
+Every build drops and recreates the schema. `--demo` therefore always writes the local
+file and never inherits `DATABASE_URL`, and rebuilding a non-SQLite database that already
+holds measurements requires `--replace`.
+
 `ingest.py` reads the Argo GDAC's synthetic-profile index, selects floats inside a
 bounding box, downloads one `_meta.nc` and one `_Sprof.nc` per float, applies the quality
 control above, bins the profiles, and writes to Postgres or SQLite. Downloads are cached
 under `.argo-cache/`, so a second run costs nothing.
 
-Every build also rewrites `frontend/src/data/tracks.json`, which is what the landing page
+A full build also rewrites `frontend/src/data/tracks.json`, which is what the landing page
 draws and counts. That is deliberate: the marketing surface cannot claim more floats than
-the database it sits in front of. `--tracks-only` regenerates it alone.
+the database it sits in front of. `--demo` skips it, so a local convenience build cannot
+cut the published page down to eight floats. `--tracks-only` regenerates it alone.
 
 ---
 
