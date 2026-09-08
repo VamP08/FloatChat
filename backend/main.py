@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from .agent_manager import initialize_agent
+from .agent_manager import get_agent_status, initialize_agent
 from .database import engine
 from .routers import chat, floats, profiles
 
@@ -42,7 +42,11 @@ def root():
     """Confirms the API is up and reports whether the language model is configured."""
     return {
         "message": "FloatChat API is running",
-        "natural_language_enabled": agent_instance is not None,
+        # Whether questions can actually be answered, and if not, why. The previous
+        # boolean reported only that an object existed, which is true even with no key.
+        "chat_available": bool(agent_instance and agent_instance.model_available),
+        "chat_status": get_agent_status(),
+        "model": agent_instance.config.MODEL if agent_instance else None,
         "docs": "/docs",
     }
 

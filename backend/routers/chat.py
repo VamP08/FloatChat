@@ -406,9 +406,14 @@ async def handle_chat_message(request: schemas.ChatRequest):
     
     if not agent_instance:
         # Fallback to simulated response if agent is not available
-        user_message = request.history[-1].content if request.history else ""
-        ai_response_content = f"This is a fallback response to your message: '{user_message}'. Agentic AI is not available."
-        return schemas.ChatMessage(role="ai", content=ai_response_content)
+        return schemas.ChatMessage(
+            role="ai",
+            content=(
+                "Questions are unavailable right now because the language model is not "
+                "configured on this server. The map, the float pages and every chart "
+                "still work, and they read the same database a question would."
+            ),
+        )
     
     try:
         # Extract the user's latest message from the chat history
