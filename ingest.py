@@ -452,8 +452,13 @@ def emit_tracks(engine, destination: Path = TRACKS_PATH) -> dict:
         dominant: dict[str, str] = {}
         for float_id, parameter in session.execute(
             text(
+                # The parameter name breaks ties. Two parameters can hold exactly the
+                # same number of readings for a float -- 2902272 has 8,760 of both
+                # chlorophyll and oxygen -- and without a second key the winner is
+                # whatever order the engine happens to return, so SQLite and Postgres
+                # coloured those floats differently on the map.
                 "SELECT float_id, parameter FROM parameter_coverage "
-                "ORDER BY n_values DESC"
+                "ORDER BY n_values DESC, parameter ASC"
             )
         ):
             if parameter in BGC_PARAMETERS and float_id not in dominant:
