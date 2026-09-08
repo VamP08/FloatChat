@@ -128,6 +128,18 @@ A full build also rewrites `frontend/src/data/tracks.json`, which is what the la
 draws and counts. That is deliberate: the front page cannot claim more floats than the
 database behind it holds. `--tracks-only` regenerates that file alone.
 
+### One more check
+
+```bash
+python check_parameters.py
+```
+
+The chat labels a result with the word the question used, so an answer about chlorophyll
+comes back as `Chlorophyll` where the interface calls that column `chla`. That mapping lives
+in two files in two languages, and when it has drifted the result was never an error: the
+chart just lost its unit, or the parameter could not be plotted at all. This reads both files
+and fails if a word the API can emit stops resolving.
+
 ## Deploying
 
 The API is a [Render](https://render.com) blueprint (`render.yaml`), the interface is a
