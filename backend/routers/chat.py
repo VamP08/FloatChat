@@ -173,12 +173,19 @@ def _create_aggregate_visualization(results: List[Dict[str, Any]], params: Dict[
     
     chart_data = []
     for result in valid_results:
+        if result.get('value') is None:
+            # No rows matched for this parameter. Charting it would draw an empty slot
+            # next to real bars; the written answer still reports that it found nothing.
+            continue
         chart_data.append({
             'parameter': result.get('parameter', 'Unknown').title(),
-            'value': round(result.get('value', 0), 3),
+            'value': round(result['value'], 3),
             'count': result.get('count', 0),
             'operation': result.get('operation', 'avg')
         })
+
+    if not chart_data:
+        return None
     
     title = f"Aggregate Statistics"
     if params.get('operation'):
@@ -229,9 +236,9 @@ def _create_anomaly_visualization(results: List[Dict[str, Any]], params: Dict[st
                 # Create synthetic data points for visualization
                 chart_data.append({
                     'parameter': param.title(),
-                    'anomaly_rate': round(anomaly_rate * 100, 1),
+                    'anomaly_rate': round((anomaly_rate or 0) * 100, 1),
                     'total_months': total_months,
-                    'average': round(period_avg, 3) if period_avg else 0,
+                    'average': round(period_avg, 3) if period_avg is not None else 0,
                     'anomalies': result.get('anomaly_count', 0)
                 })
     
