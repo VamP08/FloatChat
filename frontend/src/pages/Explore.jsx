@@ -93,6 +93,11 @@ export default function Explore() {
       </aside>
 
       <main className="relative min-h-0 flex-grow overflow-y-auto">
+        {!floatId && (
+          <h1 className="sr-only">
+            Argo floats in the northern Indian Ocean
+          </h1>
+        )}
         {floatId ? (
           <Dossier key={floatId} floatId={floatId} />
         ) : loadError ? (
@@ -108,8 +113,8 @@ export default function Explore() {
           <div className="absolute inset-0">
             <FloatMap locations={filtered} searchTerm={searchTerm} onSelect={openFloat} />
             <p
-              className="pointer-events-none absolute inset-x-0 bottom-6 z-[500] text-center
-                         text-sm text-[var(--ink-dim)]"
+              className="pointer-events-none absolute inset-x-0 bottom-6 z-[500] px-6
+                         pr-48 text-center text-sm text-[var(--ink-dim)] sm:pr-56"
             >
               {filtered.length} floats. Choose one to read where it went and what it measured.
             </p>

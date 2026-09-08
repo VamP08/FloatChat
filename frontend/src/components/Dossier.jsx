@@ -142,7 +142,15 @@ export default function Dossier({ floatId }) {
     return <p className="p-8 text-[var(--ink-dim)]">Opening float {floatId}&hellip;</p>;
   }
   if (error) {
-    return <p className="p-8 text-sm text-[var(--em-temp)]">Could not open this float: {error}</p>;
+    return (
+      <div className="p-8">
+        <h1 className="display text-2xl">Could not open float {floatId}</h1>
+        <p className="mt-3 text-[var(--ink-dim)]">{error}</p>
+        <p className="mt-2 text-sm text-[var(--ink-faint)]">
+          Pick another from the list, or check the number.
+        </p>
+      </div>
+    );
   }
 
   const dive = dives.find((d) => d.id === selectedDive);

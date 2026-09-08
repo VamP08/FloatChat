@@ -48,7 +48,7 @@ export default function DiveTimeline({ dives, selectedId, onSelect }) {
               title={`Cycle ${dive.cycle_number} · ${new Date(dive.profile_date).toLocaleDateString()}`}
               aria-label={`Dive ${dive.cycle_number} on ${new Date(dive.profile_date).toLocaleDateString()}`}
               aria-pressed={isSelected}
-              className="absolute top-0 h-14 w-3 -translate-x-1/2 cursor-pointer bg-transparent"
+              className="absolute top-0 h-14 w-6 -translate-x-1/2 cursor-pointer bg-transparent"
               style={{ left: `${left}%` }}
             >
               <span

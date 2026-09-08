@@ -35,11 +35,25 @@ function notifySlow(delta) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** FastAPI puts its message in a `detail` field; the body itself is not a sentence. */
+function readError(body, status) {
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed?.detail === "string") return parsed.detail;
+    if (Array.isArray(parsed?.detail)) return "That request was not valid.";
+  } catch {
+    // Not JSON. A proxy or gateway page, which is not worth showing either.
+  }
+  if (status === 404) return "Not found.";
+  if (status >= 500) return "The server had a problem with that request.";
+  return `Request failed with status ${status}`;
+}
+
 async function attempt(path, options) {
   const res = await fetch(`${API_URL}${path}`, options);
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const error = new Error(text || `Request failed with status ${res.status}`);
+    const body = await res.text().catch(() => "");
+    const error = new Error(readError(body, res.status));
     error.status = res.status;
     throw error;
   }

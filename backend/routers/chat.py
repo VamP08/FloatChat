@@ -450,15 +450,34 @@ async def handle_chat_message(request: schemas.ChatRequest):
             )
         else:
             error_msg = result.get('error', 'Unknown error occurred')
-            ai_response_content = f"I encountered an error while processing your query: {error_msg}"
+            # The provider's own error text is not for the visitor. A rate limit is
+            # worth naming because waiting fixes it; anything else is ours.
+            lowered = str(error_msg).lower()
+            if "429" in lowered or "rate limit" in lowered:
+                ai_response_content = (
+                    "The language model is rate limited at the moment. Wait a minute and "
+                    "ask again. The map, the float pages and the charts are unaffected."
+                )
+            else:
+                ai_response_content = (
+                    "Something went wrong answering that. The map, the float pages and "
+                    "the charts still work, and they read the same database."
+                )
             print(f"❌ Agentic AI error: {error_msg}")
         
         return schemas.ChatMessage(role="ai", content=ai_response_content)
         
     except Exception as e:
+        # Same reasoning as above: a driver or provider message means nothing to a
+        # visitor and can carry a table name or a fragment of SQL with it.
         print(f"💥 Exception in chat handler: {str(e)}")
-        ai_response_content = f"Sorry, I encountered an unexpected error: {str(e)}"
-        return schemas.ChatMessage(role="ai", content=ai_response_content)
+        return schemas.ChatMessage(
+            role="ai",
+            content=(
+                "Something went wrong answering that. The map, the float pages and "
+                "the charts still work, and they read the same database."
+            ),
+        )
 
 # Questions the template engine can actually answer against the ingested region, used
 # as the starting suggestions in the interface. Every one of these was run against the
