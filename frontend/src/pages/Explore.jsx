@@ -116,7 +116,11 @@ export default function Explore() {
               className="pointer-events-none absolute inset-x-0 bottom-6 z-[500] px-6
                          pr-48 text-center text-sm text-[var(--ink-dim)] sm:pr-56"
             >
-              {filtered.length} floats. Choose one to read where it went and what it measured.
+              {filtered.length === 0
+                ? `No float matches ${searchTerm.trim()}. Clear the search to see all ${locations.length}.`
+                : searchTerm.trim()
+                  ? `${filtered.length} of ${locations.length} floats match ${searchTerm.trim()}.`
+                  : `${filtered.length} floats. Choose one to read where it went and what it measured.`}
             </p>
           </div>
         )}

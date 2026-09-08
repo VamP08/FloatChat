@@ -31,12 +31,21 @@ export default function FloatList({ onSelect, filterTerm = "" }) {
     return <p className="p-4 text-sm text-[var(--em-temp)]">Could not load the floats: {error}</p>;
   }
 
+  const shown = floats.filter((float) => float.id.toString().includes(filterTerm.trim()));
+
+  if (floats.length > 0 && shown.length === 0) {
+    return (
+      <p className="p-4 text-sm leading-relaxed text-[var(--ink-dim)]">
+        No float here has {filterTerm.trim()} in its number. The {floats.length} floats
+        are the biogeochemical ones reporting in this region.
+      </p>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <ul className="p-2">
-        {floats
-          .filter((float) => float.id.toString().includes(filterTerm.trim()))
-          .map((float) => {
+        {shown.map((float) => {
           const record = RECORD.get(float.id);
           const colour = EMISSION[record?.bgc] ?? "#687e8f";
           const isSelected = float.id === selectedFloat;
