@@ -31,3 +31,35 @@ export function presentIn(rows) {
   if (!rows?.length) return [];
   return PARAMETER_KEYS.filter((key) => rows.some((row) => row[key] != null));
 }
+
+/**
+ * The words the chat API uses for each column, mirroring PARAMETER_SYNONYMS in
+ * backend/agentic_ai/config.py.
+ *
+ * An answer comes back labelled the way the question asked it, so "Chlorophyll" and
+ * "Oxygen" arrive where this file says chla and doxy. Without the mapping a chart
+ * silently drops the unit, which on a page whose whole claim is that the numbers are
+ * right is worse than showing nothing.
+ */
+const ALIASES = {
+  temp: ["temperature"],
+  psal: ["salinity", "sal"],
+  doxy: ["oxygen", "o2", "dissolved oxygen"],
+  chla: ["chlorophyll", "chl"],
+  nitrate: ["no3"],
+  bbp700: ["backscatter", "particle backscatter"],
+  ph: ["acidity", "ph_total"],
+};
+
+const KEY_BY_LABEL = new Map(
+  Object.entries(PARAMETERS).flatMap(([key, { name }]) => [
+    [key, key],
+    [name.toLowerCase(), key],
+    ...(ALIASES[key] ?? []).map((alias) => [alias, key]),
+  ]),
+);
+
+/** The column key behind a label the API used, or undefined if it is not one of ours. */
+export function keyForLabel(label) {
+  return KEY_BY_LABEL.get(String(label ?? "").trim().toLowerCase());
+}
