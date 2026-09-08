@@ -1,238 +1,151 @@
+"""The four operations the language model is allowed to ask for.
+
+These are plain JSON Schema, which is what Groq's OpenAI-compatible tool-calling API
+expects. The model chooses one and fills in typed arguments; it never sees the database,
+the schema, or any SQL.
+
+Optional arguments accept ``null`` as well as their own type. The model emits null
+for fields it does not want, and Groq validates the arguments against this schema
+before returning the call, so a bare ``"type": "array"`` rejects the whole call.
+
+Regions are an ``enum`` rather than a description. A described constraint is advice the
+model may ignore; an enum is a constraint the API enforces, so a question about the
+Pacific cannot even be expressed as a call. The engine still raises if one gets through,
+because two layers of the same guarantee is the point.
 """
-Function schemas for Gemini function calling
-"""
-from google.genai import types
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+
+from typing import Any, Dict, List
+
+from .config import AgenticConfig
+
+REGION_NAMES = sorted(AgenticConfig.REGIONS)
+PARAMETER_NAMES = [
+    "temperature", "salinity", "oxygen", "chlorophyll", "nitrate", "ph",
+    "backscatter", "pressure",
+]
+
+_REGION = {
+    "type": ["string", "null"],
+    "enum": REGION_NAMES,
+    "description": (
+        "Region to query. The database covers the northern Indian Ocean only; no other "
+        "ocean has any data at all."
+    ),
+}
+_PARAMETERS = {
+    "type": "array",
+    "items": {"type": "string", "enum": PARAMETER_NAMES},
+    "description": "Which measurements to report.",
+}
+_DATE_RANGE = {
+    "type": ["array", "null"],
+    "items": {"type": "string"},
+    "description": "Date range as [start, end] in YYYY-MM-DD. Data runs 2014 to 2026.",
+}
+_DEPTH_RANGE = {
+    "type": ["array", "null"],
+    "items": {"type": "number"},
+    "description": (
+        "Depth range as [min, max] in decibar, where one decibar is about one metre. "
+        "Floats reach roughly 2000."
+    ),
+}
+
+
+def _tool(name: str, description: str, properties: Dict[str, Any], required: List[str]):
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+            },
+        },
+    }
+
+
+TOOLS: List[Dict[str, Any]] = [
+    _tool(
+        "query_aggregate_statistics",
+        "Average, maximum, minimum, count or standard deviation of one or more "
+        "measurements, optionally within a region, date range or depth band.",
+        {
+            "region": _REGION,
+            "parameters": _PARAMETERS,
+            "date_range": _DATE_RANGE,
+            "depth_range": _DEPTH_RANGE,
+            "operation": {
+                "type": ["string", "null"],
+                "enum": ["average", "maximum", "minimum", "count", "std"],
+                "description": "Which statistic to compute. Defaults to average.",
+            },
+        },
+        ["parameters"],
+    ),
+    _tool(
+        "detect_anomalies_and_trends",
+        "Find months whose values sit far from the period average, and describe how a "
+        "measurement has trended over time. Use for questions about unusual values, "
+        "changes or trends.",
+        {
+            "region": _REGION,
+            "parameters": _PARAMETERS,
+            "date_range": _DATE_RANGE,
+            "depth_range": _DEPTH_RANGE,
+            "statistical_threshold": {
+                "type": ["number", "null"],
+                "description": "Standard deviations from the mean before a month counts "
+                               "as anomalous. Defaults to 2.",
+            },
+        },
+        ["parameters"],
+    ),
+    _tool(
+        "query_profile_data",
+        "Individual vertical profiles: the measured values at each depth for dives "
+        "matching a region, date range or depth band.",
+        {
+            "region": _REGION,
+            "parameters": _PARAMETERS,
+            "date_range": _DATE_RANGE,
+            "depth_range": _DEPTH_RANGE,
+            "limit": {
+                "type": ["integer", "null"],
+                "description": "Maximum profiles to return. Defaults to 100.",
+            },
+        },
+        ["parameters"],
+    ),
+    _tool(
+        "compare_oceanographic_data",
+        "Compare one region or time period against another for the same measurements.",
+        {
+            "regions": {
+                "type": ["array", "null"],
+                "items": {"type": "string", "enum": REGION_NAMES},
+                "description": "The two regions to compare.",
+            },
+            "parameters": _PARAMETERS,
+            "time_periods": {
+                "type": ["array", "null"],
+                "items": {"type": "array", "items": {"type": "string"}},
+                "description": "Optional [start, end] pairs, one per period compared.",
+            },
+            "depth_range": _DEPTH_RANGE,
+        },
+        ["parameters"],
+    ),
+]
+
+TOOL_NAMES = [tool["function"]["name"] for tool in TOOLS]
+
 
 class OceanQueryFunctions:
-    """Define function schemas for oceanographic data queries"""
-    
-    @staticmethod
-    def get_query_parameters_function():
-        """Function to extract oceanographic query parameters"""
-        return types.FunctionDeclaration(
-            name='extract_ocean_query_parameters',
-            description='Extract structured parameters from a natural language oceanographic query',
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    'region': types.Schema(
-                        type=types.Type.STRING,
-                        description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.',
-                    ),
-                    'lat_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Latitude bounds [min, max] in decimal degrees',
-                    ),
-                    'lon_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Longitude bounds [min, max] in decimal degrees',
-                    ),
-                    'date_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Date range [start_date, end_date] in YYYY-MM-DD format',
-                    ),
-                    'parameters': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Oceanographic parameters (temperature, salinity, oxygen, etc.) or "all" for all parameters',
-                    ),
-                    'depth_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Depth range [min, max] in pressure (decibar). Note: 1 decibar ≈ 1 meter depth. Pressure values represent ocean depth.',
-                    ),
-                    'operation': types.Schema(
-                        type=types.Type.STRING,
-                        description='Analysis operation (average, trend, anomaly, profile, compare, count, max, min)',
-                    ),
-                    'aggregation_level': types.Schema(
-                        type=types.Type.STRING,
-                        description='Temporal aggregation (daily, monthly, yearly, seasonal)',
-                    ),
-                    'comparison_reference': types.Schema(
-                        type=types.Type.STRING,
-                        description='Reference for comparison (historical_average, previous_year, climatology)',
-                    ),
-                    'statistical_threshold': types.Schema(
-                        type=types.Type.NUMBER,
-                        description='Threshold for anomaly detection (e.g., 2 for 2-sigma anomalies)',
-                    ),
-                },
-                required=['operation'],
-            ),
-        )
-    
-    @staticmethod
-    def get_aggregate_data_function():
-        """Function to query aggregate statistics"""
-        return types.FunctionDeclaration(
-            name='query_aggregate_statistics',
-            description='Query aggregate statistics (mean, max, min, count, standard deviation) for oceanographic parameters like temperature, salinity, oxygen, etc.',
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    'region': types.Schema(
-                        type=types.Type.STRING,
-                        description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.',
-                    ),
-                    'lat_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Latitude bounds [min, max] in decimal degrees',
-                    ),
-                    'lon_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Longitude bounds [min, max] in decimal degrees',
-                    ),
-                    'date_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Date range [start_date, end_date] in YYYY-MM-DD format',
-                    ),
-                    'parameters': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Oceanographic parameters: temperature, salinity, oxygen, chlorophyll, nitrate, ph, pressure',
-                    ),
-                    'depth_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                        description='Depth range [min, max] in pressure (decibar). Note: 1 decibar ≈ 1 meter depth. Pressure values represent ocean depth.',
-                    ),
-                    'operation': types.Schema(
-                        type=types.Type.STRING,
-                        description='Statistical operation: average, maximum, minimum, count, standard_deviation',
-                    ),
-                    'aggregation_level': types.Schema(
-                        type=types.Type.STRING,
-                        description='Temporal aggregation level: daily, monthly, yearly',
-                    ),
-                },
-                required=['parameters'],
-            ),
-        )
-    
-    @staticmethod
-    def get_anomaly_detection_function():
-        """Function to detect anomalies and trends with enhanced analysis"""
-        return types.FunctionDeclaration(
-            name='detect_anomalies_and_trends',
-            description='Advanced anomaly detection and trend analysis for oceanographic parameters. Analyzes monthly patterns, statistical anomalies, and trend directions. If no timeframe specified, analyzes the last year. If no parameters specified, analyzes all available parameters.',
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    'region': types.Schema(type=types.Type.STRING, description='Region to query. Supported: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean. The database covers the northern Indian Ocean only; no other ocean has data.'),
-                    'parameters': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Parameters to analyze: temperature, salinity, oxygen, chlorophyll, nitrate, ph. Use "all" for comprehensive analysis.',
-                    ),
-                    'date_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Optional date range [start_date, end_date] in YYYY-MM-DD format. Defaults to last year if not specified.',
-                    ),
-                    'statistical_threshold': types.Schema(
-                        type=types.Type.NUMBER,
-                        description='Z-score threshold for anomaly detection (default: 2.0)',
-                    ),
-                },
-                required=['region'],
-            ),
-        )
-    
-    @staticmethod
-    def get_profile_data_function():
-        """Function to retrieve detailed profile data"""
-        return types.FunctionDeclaration(
-            name='query_profile_data',
-            description='Retrieve detailed vertical profiles or time series data',
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    'region': types.Schema(type=types.Type.STRING),
-                    'lat_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                    ),
-                    'lon_bounds': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                    ),
-                    'date_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                    ),
-                    'parameters': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                    ),
-                    'max_profiles': types.Schema(
-                        type=types.Type.INTEGER,
-                        description='Maximum number of profiles to return',
-                    ),
-                    'profile_type': types.Schema(
-                        type=types.Type.STRING,
-                        description='Type of profile data (vertical, temporal, spatial)',
-                    ),
-                },
-                required=['parameters', 'profile_type'],
-            ),
-        )
-    
-    @staticmethod
-    def get_comparison_function():
-        """Function to compare data across regions, time periods, or parameters"""
-        return types.FunctionDeclaration(
-            name='compare_oceanographic_data',
-            description='Compare oceanographic data across different regions, time periods, or parameters',
-            parameters=types.Schema(
-                type=types.Type.OBJECT,
-                properties={
-                    'comparison_type': types.Schema(
-                        type=types.Type.STRING,
-                        description='Type of comparison (regional, temporal, parametric)',
-                    ),
-                    'regions': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                        description='Two regions to compare, from: arabian sea, bay of bengal, laccadive sea, equatorial indian ocean, north indian ocean',
-                    ),
-                    'time_periods': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(
-                            type=types.Type.ARRAY,
-                            items=types.Schema(type=types.Type.STRING),
-                        ),
-                        description='List of time periods [start, end] to compare',
-                    ),
-                    'parameters': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.STRING),
-                    ),
-                    'depth_range': types.Schema(
-                        type=types.Type.ARRAY,
-                        items=types.Schema(type=types.Type.NUMBER),
-                    ),
-                    'operation': types.Schema(type=types.Type.STRING),
-                },
-                required=['comparison_type', 'parameters'],
-            ),
-        )
+    """Kept as a class because the agent asks it for the tool list."""
 
     @staticmethod
-    def get_all_functions():
-        """Get all function declarations as tools"""
-        functions = [
-            OceanQueryFunctions.get_aggregate_data_function(),
-            OceanQueryFunctions.get_anomaly_detection_function(),
-            OceanQueryFunctions.get_profile_data_function(),
-            OceanQueryFunctions.get_comparison_function(),
-        ]
-        return [types.Tool(function_declarations=[func]) for func in functions]
+    def get_all_functions() -> List[Dict[str, Any]]:
+        return TOOLS

@@ -5,8 +5,11 @@ from typing import Dict
 
 
 class AgenticConfig:
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    # Groq hosts the model behind an OpenAI-compatible API. Any tool-calling model
+    # works; this one supports parallel tool use and is fast enough that the answer
+    # arrives before the chart does.
+    MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
     # Only regions the ingested data actually covers. Naming a region the database has
     # never seen produces an empty result the model then has to explain away, so the

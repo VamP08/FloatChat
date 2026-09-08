@@ -93,8 +93,7 @@ cd frontend && npm install && npm run dev
 
 That is the whole setup. No database to provision, no keys: the map, the float dossiers
 and the charts all work against the committed SQLite. Only the chat needs a key —
-copy `.env.example` to `.env` and add a [Google AI Studio](https://aistudio.google.com/apikey)
-one.
+copy `.env.example` to `.env` and add a [Groq](https://console.groq.com/keys) one.
 
 ### Rebuilding the database from source
 
@@ -127,7 +126,7 @@ Postgres — [Neon](https://neon.com)'s free tier fits the full 83-float set at 
 | Where | Variable | |
 |---|---|---|
 | Render | `DATABASE_URL` | Postgres connection string |
-| Render | `GEMINI_API_KEY` | for the chat |
+| Render | `GROQ_API_KEY` | for the chat |
 | Render | `CORS_ORIGINS` | the deployed frontend's origin |
 | Vercel | `VITE_API_URL` | the deployed API's origin |
 

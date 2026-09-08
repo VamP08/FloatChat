@@ -5,5 +5,5 @@ uvicorn[standard]==0.52.4
 SQLAlchemy==2.0.52
 pydantic==2.13.5
 psycopg[binary]==3.3.5
-google-genai==2.22.0
+groq==1.7.0
 python-dotenv==1.2.3

@@ -8,7 +8,7 @@ try:
     from .agentic_ai.agent import OceanographicAgent
 
     AGENT_IMPORTABLE = True
-except ImportError as error:  # google-genai is optional; the API still serves data without it
+except ImportError as error:  # the Groq SDK is optional; data endpoints work without it
     print(f"Natural-language agent unavailable: {error}")
     AGENT_IMPORTABLE = False
     OceanographicAgent = None
@@ -27,7 +27,7 @@ def initialize_agent() -> Optional[Any]:
         agent_instance = OceanographicAgent(db_url=DATABASE_URL)
         print(
             "Natural-language agent ready "
-            f"(language model configured: {agent_instance.gemini_available})"
+            f"(language model configured: {agent_instance.model_available})"
         )
         return agent_instance
     except Exception as error:

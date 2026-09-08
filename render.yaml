@@ -22,8 +22,8 @@ services:
       # committed under data/, which holds 8 floats rather than 83.
       - key: DATABASE_URL
         sync: false
-      # Google AI Studio key. The data endpoints work without it; only the chat needs it.
-      - key: GEMINI_API_KEY
+      # Groq key. The data endpoints work without it; only the chat needs it.
+      - key: GROQ_API_KEY
         sync: false
       # The deployed frontend's origin, comma separated.
       - key: CORS_ORIGINS

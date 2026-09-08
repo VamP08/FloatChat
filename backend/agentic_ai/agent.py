@@ -1,5 +1,13 @@
-"""
-Main Agentic AI Agent for Oceanographic Data Analysis
+"""The natural-language layer.
+
+A question goes to a language model together with four tool declarations. The model
+chooses one and supplies typed arguments; this file executes that choice against the SQL
+template engine and hands the result back for the model to phrase. The model never sees
+the database and never writes SQL.
+
+Groq hosts the model behind an OpenAI-compatible API, so the tool declarations in
+functions.py are plain JSON Schema and the loop below is the standard two-turn tool
+exchange: ask, execute what came back, answer with the results in hand.
 """
 import os
 import json
@@ -7,49 +15,41 @@ from typing import Dict, List, Any, Optional
 from datetime import date, timedelta, datetime
 import asyncio
 from dotenv import load_dotenv
+
 load_dotenv()
-# Import Google GenAI when available
+
 try:
-    from google import genai
-    from google.genai import types
-    GENAI_AVAILABLE = True
+    from groq import Groq
+
+    GROQ_AVAILABLE = True
 except ImportError:
-    print("Google GenAI not available. Install with: pip install google-genai")
-    GENAI_AVAILABLE = False
+    print("Groq SDK not available. Install with: pip install groq")
+    GROQ_AVAILABLE = False
 
 from .config import AgenticConfig
 from .sql_engine import SQLTemplateEngine
 from .functions import OceanQueryFunctions
 
+
 class OceanographicAgent:
-    """
-    Agentic AI Agent that combines Gemini 2.5 Flash with SQL Template Engine
-    for natural language oceanographic data queries
-    """
-    
+    """Answers questions about the Argo database using declared tools only."""
+
     def __init__(self, db_url: str, api_key: Optional[str] = None):
         self.db_url = db_url
         self.config = AgenticConfig()
         self.sql_engine = SQLTemplateEngine(db_url)
-        
-        # Initialize Gemini client if available
-        if GENAI_AVAILABLE and (api_key or self.config.GEMINI_API_KEY):
-            self.api_key = api_key or self.config.GEMINI_API_KEY
-            self.client = genai.Client(api_key=self.api_key)
-            self.gemini_available = True
+        self.functions = OceanQueryFunctions()
+        self.tools = self.functions.get_all_functions()
+
+        key = api_key or self.config.GROQ_API_KEY
+        if GROQ_AVAILABLE and key:
+            self.client = Groq(api_key=key)
+            self.model_available = True
         else:
             self.client = None
-            self.gemini_available = False
-            print("Warning: Gemini API not configured. Using fallback query processing.")
-        
-        # Initialize function tools
-        if GENAI_AVAILABLE:
-            self.functions = OceanQueryFunctions()
-            self.tools = self.functions.get_all_functions()
-        else:
-            self.functions = None
-            self.tools = []
-    
+            self.model_available = False
+            print("Warning: GROQ_API_KEY not set. Falling back to keyword extraction.")
+
     def _extract_parameters_fallback(self, query: str) -> Dict[str, Any]:
         """
         Fallback parameter extraction using simple text analysis
@@ -98,185 +98,175 @@ class OceanographicAgent:
         return params
     
     async def process_query(self, user_query: str) -> Dict[str, Any]:
-        """
-        Main method to process a natural language oceanographic query
-        """
+        """Answer one question. Falls back to keyword extraction without a key."""
         try:
-            if self.gemini_available:
-                return await self._process_with_gemini(user_query)
-            else:
-                return await self._process_with_fallback(user_query)
+            if self.model_available:
+                return await self._process_with_model(user_query)
+            return await self._process_with_fallback(user_query)
         except Exception as e:
             return {
-                'success': False,
-                'error': str(e),
-                'message': 'An error occurred while processing your query.',
-                'query': user_query
+                "success": False,
+                "error": str(e),
+                "message": "An error occurred while processing your query.",
+                "query": user_query,
             }
-    
-    async def _process_with_gemini(self, user_query: str) -> Dict[str, Any]:
-        """Process query using Gemini function calling"""
-        
-        try:
-            # First, let Gemini analyze the query and decide what to do
-            initial_response = self.client.models.generate_content(
-                model=self.config.GEMINI_MODEL,
-                contents=f"""
-                {self.config.SYSTEM_PROMPT}
-                
-                User query: "{user_query}"
-                
-                Analyze this oceanographic query. If you need to query the database, use the appropriate function calls.
-                If you can answer directly based on general oceanographic knowledge, do so.
-                """,
-                config=types.GenerateContentConfig(
-                    tools=self.tools,
-                    automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                        disable=True  # We want to handle function calls manually for better control
-                    ),
-                ),
-            )
-            
-            # Check if function calling is needed
-            if initial_response.function_calls:
-                # Process function calls
-                return await self._handle_function_calls(user_query, initial_response)
-            else:
-                # Direct response without database query
-                return {
-                    'success': True,
-                    'response': initial_response.text,
-                    'query': user_query,
-                    'function_calls_made': False,
-                    'data_queried': False
-                }
-                
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'message': 'Error processing query with Gemini',
-                'query': user_query
-            }
-    
-    async def _handle_function_calls(self, user_query: str, gemini_response) -> Dict[str, Any]:
-        """Handle function calls from Gemini response"""
-        
-        function_results = []
-        data_summaries = []
-        
-        for function_call in gemini_response.function_calls:
-            function_name = function_call.name
-            function_args = function_call.args
-            
-            print(f"🔧 Executing function: {function_name}")
-            print(f"   Args: {function_args}")
-            
-            # Execute the appropriate SQL query based on function call
-            try:
-                if function_name == 'query_aggregate_statistics':
-                    results = self.sql_engine.query_aggregate_statistics(**function_args)
-                    function_results.append({
-                        'function': function_name,
-                        'results': results,
-                        'parameters': function_args
-                    })
-                    data_summaries.extend(self._summarize_aggregate_results(results))
-                    
-                elif function_name == 'detect_anomalies_and_trends':
-                    results = self.sql_engine.detect_anomalies_and_trends(**function_args)
-                    function_results.append({
-                        'function': function_name,
-                        'results': results,
-                        'parameters': function_args
-                    })
-                    data_summaries.extend(self._summarize_anomaly_results(results))
-                    
-                elif function_name == 'query_profile_data':
-                    results = self.sql_engine.query_profile_data(**function_args)
-                    function_results.append({
-                        'function': function_name,
-                        'results': results[:10],  # Limit for summary
-                        'total_profiles': len(results),
-                        'parameters': function_args
-                    })
-                    data_summaries.extend(self._summarize_profile_results(results, function_args))
-                    
-                elif function_name == 'compare_oceanographic_data':
-                    results = self.sql_engine.compare_oceanographic_data(**function_args)
-                    function_results.append({
-                        'function': function_name,
-                        'results': results,
-                        'parameters': function_args
-                    })
-                    data_summaries.extend(self._summarize_comparison_results(results))
-                    
-            except Exception as e:
-                function_results.append({
-                    'function': function_name,
-                    'error': str(e),
-                    'parameters': function_args
-                })
-        
-        # Create function response content
-        function_response_parts = []
-        for i, result in enumerate(function_results):
-            if 'error' in result:
-                response_data = {'error': result['error']}
-            else:
-                # Pass the full structured results to Gemini so it knows all parameters
-                response_data = {
-                    'results': result['results'],  # Full structured data
-                    'summary': data_summaries[i] if i < len(data_summaries) else None
-                }
 
-            function_response_part = types.Part.from_function_response(
-                name=gemini_response.function_calls[i].name,
-                response=response_data,
-            )
-            function_response_parts.append(function_response_part)
-        
-        function_response_content = types.Content(
-            role='model', 
-            parts=function_response_parts
-        )
-        
-        # Get final response from Gemini with the function results
-        user_content = types.Content(
-            role='user',
-            parts=[types.Part.from_text(text=user_query)],
-        )
-        
-        final_response = self.client.models.generate_content(
-            model=self.config.GEMINI_MODEL,
-            contents=[
-                user_content,
-                gemini_response.candidates[0].content,
-                function_response_content,
-            ],
-            config=types.GenerateContentConfig(
-                tools=self.tools,
-            ),
-        )
-        
-        # Handle case where Gemini response might not have text
-        response_text = final_response.text
-        if response_text is None:
-            # Generate a fallback response using the function results
-            response_text = self._generate_fallback_from_function_results(function_results, user_query)
-        
-        return {
-            'success': True,
-            'response': response_text,
-            'query': user_query,
-            'function_calls_made': True,
-            'function_results': function_results,
-            'data_queried': True,
-            'summary_stats': self._generate_summary_stats(function_results)
+    def _complete(self, messages: List[Dict[str, Any]], with_tools: bool):
+        """One call to the model. Tools are offered only on the first turn."""
+        kwargs: Dict[str, Any] = {
+            "model": self.config.MODEL,
+            "messages": messages,
+            "temperature": 0.2,
         }
-    
+        if with_tools:
+            kwargs["tools"] = self.tools
+            kwargs["tool_choice"] = "auto"
+        return self.client.chat.completions.create(**kwargs).choices[0].message
+
+    async def _process_with_model(self, user_query: str) -> Dict[str, Any]:
+        """Ask, execute whatever tools come back, then answer with the results."""
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": self.config.SYSTEM_PROMPT},
+            {"role": "user", "content": user_query},
+        ]
+
+        try:
+            first = await asyncio.to_thread(self._complete, messages, True)
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Could not reach the language model.",
+                "query": user_query,
+            }
+
+        if not getattr(first, "tool_calls", None):
+            # No tool call means nothing was read from the database, so nothing here is
+            # grounded. Say that rather than dressing it up as an answer.
+            return {
+                "success": True,
+                "response": first.content or "I could not turn that into a query I can run.",
+                "query": user_query,
+                "function_calls_made": False,
+                "data_queried": False,
+            }
+
+        return await self._handle_function_calls(user_query, messages, first)
+
+    async def _handle_function_calls(
+        self, user_query: str, messages: List[Dict[str, Any]], assistant_message
+    ) -> Dict[str, Any]:
+        """Run each requested tool and let the model phrase the results."""
+        function_results: List[Dict[str, Any]] = []
+        data_summaries: List[str] = []
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": assistant_message.content or "",
+                "tool_calls": [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.function.name,
+                            "arguments": call.function.arguments,
+                        },
+                    }
+                    for call in assistant_message.tool_calls
+                ],
+            }
+        )
+
+        runners = {
+            "query_aggregate_statistics": (
+                self.sql_engine.query_aggregate_statistics,
+                self._summarize_aggregate_results,
+            ),
+            "detect_anomalies_and_trends": (
+                self.sql_engine.detect_anomalies_and_trends,
+                self._summarize_anomaly_results,
+            ),
+            "query_profile_data": (self.sql_engine.query_profile_data, None),
+            "compare_oceanographic_data": (
+                self.sql_engine.compare_oceanographic_data,
+                self._summarize_comparison_results,
+            ),
+        }
+
+        for call in assistant_message.tool_calls:
+            name = call.function.name
+            try:
+                args = json.loads(call.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+
+            print(f"executing {name} with {args}")
+
+            if name not in runners:
+                message = f"{name} is not a function this system has."
+                function_results.append(
+                    {"function": name, "error": message, "parameters": args}
+                )
+                payload = {"error": message}
+            else:
+                runner, summarizer = runners[name]
+                try:
+                    results = runner(**args)
+                    entry = {"function": name, "results": results, "parameters": args}
+                    if name == "query_profile_data":
+                        entry["results"] = results[:10]
+                        entry["total_profiles"] = len(results)
+                        data_summaries.extend(
+                            self._summarize_profile_results(results, args)
+                        )
+                    elif summarizer:
+                        data_summaries.extend(summarizer(results))
+                    function_results.append(entry)
+                    payload = {
+                        "results": entry["results"],
+                        "summary": data_summaries[-1] if data_summaries else None,
+                    }
+                except Exception as e:
+                    # UnsupportedRegion lands here, and its message is exactly what the
+                    # visitor should be told: which regions actually exist.
+                    function_results.append(
+                        {"function": name, "error": str(e), "parameters": args}
+                    )
+                    payload = {"error": str(e)}
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "name": name,
+                    "content": json.dumps(payload, default=str)[:12000],
+                }
+            )
+
+        try:
+            final = await asyncio.to_thread(self._complete, messages, False)
+            response_text = final.content
+        except Exception:
+            response_text = None
+
+        if not response_text:
+            response_text = self._generate_fallback_from_function_results(
+                function_results, user_query
+            )
+
+        return {
+            "success": True,
+            "response": response_text,
+            "query": user_query,
+            "function_calls_made": True,
+            "function_results": function_results,
+            "data_queried": True,
+            "summary_stats": self._generate_summary_stats(function_results),
+        }
+
     async def _process_with_fallback(self, user_query: str) -> Dict[str, Any]:
-        """Process query using fallback method when Gemini is not available"""
+        """Answer without a language model, by pulling parameters out of the text"""
         
         # Extract parameters using simple text analysis
         params = self._extract_parameters_fallback(user_query)

@@ -300,7 +300,14 @@ class SQLTemplateEngine:
     def detect_anomalies_and_trends(self, **kwargs) -> List[Dict[str, Any]]:
         """Enhanced anomaly detection with trend analysis and comprehensive parameter coverage"""
         parameters = kwargs.get('parameters', [])
-        statistical_threshold = kwargs.get('statistical_threshold', 2.0)
+        # This one value is interpolated into the template rather than bound, because it
+        # sits inside a CASE expression. Coercing it to a float is therefore load-bearing
+        # twice over: it restores the default when the model sends null, and it
+        # guarantees that whatever reaches the SQL is a number and nothing else.
+        try:
+            statistical_threshold = float(kwargs.get('statistical_threshold') or 2.0)
+        except (TypeError, ValueError):
+            statistical_threshold = 2.0
 
         # Auto-set timeframe if not provided
         if not kwargs.get('date_range'):
@@ -512,7 +519,9 @@ class SQLTemplateEngine:
         """Query detailed profile data"""
         parameters = kwargs.get('parameters', [])
         profile_type = kwargs.get('profile_type', 'vertical')
-        max_profiles = kwargs.get('max_profiles', 100)
+        # The tool schema calls this 'limit'; the original signature called it
+        # 'max_profiles'. Accept both so neither name silently does nothing.
+        max_profiles = kwargs.get('limit') or kwargs.get('max_profiles') or 100
         
         # Build filters
         spatial_filter, spatial_params = self._build_spatial_filter(
@@ -522,6 +531,13 @@ class SQLTemplateEngine:
         )
         temporal_filter, temporal_params = self._build_temporal_filter(
             kwargs.get('date_range')
+        )
+        # This function used to ignore depth_range entirely. A question about oxygen
+        # below 500 decibar therefore returned surface rows, which the model reported
+        # as "there are no measurements below 500 decibar" -- the same dropped-filter
+        # failure as the unknown-region bug, with the same confident wrong answer.
+        depth_filter, depth_params = self._build_depth_filter(
+            kwargs.get('depth_range')
         )
         
         filters = []
@@ -534,6 +550,10 @@ class SQLTemplateEngine:
         if temporal_filter:
             filters.append(temporal_filter)
             all_params.extend(temporal_params)
+
+        if depth_filter:
+            filters.append(depth_filter)
+            all_params.extend(depth_params)
         
         where_clause = " AND ".join(filters) if filters else "1=1"
         
