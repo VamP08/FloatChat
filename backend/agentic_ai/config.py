@@ -104,9 +104,29 @@ class AgenticConfig:
 
     @staticmethod
     def normalize_parameter(param: str) -> str:
-        """Map whatever a person called a parameter to its database column name."""
+        """Map whatever a person called a parameter to its database column name.
+
+        Raises rather than passing an unrecognised word through. The word would
+        otherwise be interpolated into the SELECT list as a column name, and Postgres
+        answered a question about the Arabian Sea with
+        "column m.backscatter does not exist" printed to the visitor.
+        """
         word = (param or "").lower().strip()
         for column, synonyms in AgenticConfig.PARAMETER_SYNONYMS.items():
-            if word in synonyms:
+            if word == column or word in synonyms:
                 return column
-        return word
+        raise UnknownParameter(param)
+
+
+class UnknownParameter(ValueError):
+    """Raised when a query names a measurement the database does not hold."""
+
+    def __init__(self, parameter: str):
+        self.parameter = parameter
+        known = ", ".join(
+            sorted(words[0] for words in AgenticConfig.PARAMETER_SYNONYMS.values())
+        )
+        super().__init__(
+            f"There is no measurement called '{parameter}' in this database. "
+            f"It holds: {known}."
+        )

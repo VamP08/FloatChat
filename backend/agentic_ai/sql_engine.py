@@ -226,19 +226,8 @@ class SQLTemplateEngine:
         
         with self._get_connection() as conn:
             for param in parameters:
-                # Map parameter names to actual column names
-                param_mapping = {
-                    'temperature': 'temp',
-                    'salinity': 'psal',
-                    'oxygen': 'doxy',
-                    'chlorophyll': 'chla',
-                    'nitrate': 'nitrate',
-                    'ph': 'ph',
-                    'bbp700': 'bbp700',
-                    'pressure': 'pressure'
-                }
                 
-                param_norm = param_mapping.get(param, param)
+                param_norm = self.config.normalize_parameter(param)
                 
                 # Build SQL query with JOIN between profiles and measurements
                 if operation.lower() in ['std', 'standard_deviation']:
@@ -352,19 +341,8 @@ class SQLTemplateEngine:
 
         with self._get_connection() as conn:
             for param in parameters:
-                # Map parameter names to actual column names
-                param_mapping = {
-                    'temperature': 'temp',
-                    'salinity': 'psal',
-                    'oxygen': 'doxy',
-                    'chlorophyll': 'chla',
-                    'nitrate': 'nitrate',
-                    'ph': 'ph',
-                    'bbp700': 'bbp700',
-                    'pressure': 'pressure'
-                }
 
-                param_norm = param_mapping.get(param, param)
+                param_norm = self.config.normalize_parameter(param)
 
                 # Enhanced anomaly detection with multiple methods
                 monthly_series = self._string_agg(
@@ -556,20 +534,10 @@ class SQLTemplateEngine:
         where_clause = " AND ".join(filters) if filters else "1=1"
         
         # Build column selection with parameter mapping
-        param_mapping = {
-            'temperature': 'temp',
-            'salinity': 'psal',
-            'oxygen': 'doxy',
-            'chlorophyll': 'chla',
-            'nitrate': 'nitrate',
-            'ph': 'ph',
-            'bbp700': 'bbp700',
-            'pressure': 'pressure'
-        }
         
         param_columns = []
         for param in parameters:
-            param_norm = param_mapping.get(param, param)
+            param_norm = self.config.normalize_parameter(param)
             param_columns.append(f"m.{param_norm} as {param}")
         
         columns_str = ", ".join(param_columns)
@@ -626,19 +594,10 @@ class SQLTemplateEngine:
         temporal_where = temporal_filter if temporal_filter else "1=1"
         
         # Build parameter columns
-        param_mapping = {
-            'temperature': 'temp',
-            'salinity': 'psal',
-            'oxygen': 'doxy',
-            'chlorophyll': 'chla',
-            'nitrate': 'nitrate',
-            'ph': 'ph',
-            'bbp700': 'bbp700'
-        }
         
         param_columns = []
         for param in parameters:
-            param_norm = param_mapping.get(param, param)
+            param_norm = self.config.normalize_parameter(param)
             param_columns.append(f"AVG(m.{param_norm}) as {param}")
         
         columns_str = ", ".join(param_columns)
@@ -788,16 +747,6 @@ class SQLTemplateEngine:
             }
             
             # Check which parameters have data
-            param_mapping = {
-                'temperature': 'temp',
-                'salinity': 'psal',
-                'oxygen': 'doxy',
-                'chlorophyll': 'chla',
-                'nitrate': 'nitrate',
-                'ph': 'ph',
-                'bbp700': 'bbp700',
-                'pressure': 'pressure'
-            }
             
             # Iterate over the database columns themselves; the config's PARAMETERS
             # list holds every synonym a person might type, not column names.

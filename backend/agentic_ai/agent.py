@@ -23,8 +23,8 @@ except ImportError:
     print("Groq SDK not available. Install with: pip install groq")
     GROQ_AVAILABLE = False
 
-from .config import AgenticConfig
-from .sql_engine import SQLTemplateEngine
+from .config import AgenticConfig, UnknownParameter
+from .sql_engine import SQLTemplateEngine, UnsupportedRegion
 from .functions import OceanQueryFunctions
 
 
@@ -224,13 +224,26 @@ class OceanographicAgent:
                         "results": entry["results"],
                         "summary": data_summaries[-1] if data_summaries else None,
                     }
-                except Exception as e:
-                    # UnsupportedRegion lands here, and its message is exactly what the
-                    # visitor should be told: which regions actually exist.
+                except (UnsupportedRegion, UnknownParameter) as e:
+                    # Refusals this system raises on purpose. The message names what the
+                    # database does hold, which is exactly what the visitor should read.
                     function_results.append(
                         {"function": name, "error": str(e), "parameters": args}
                     )
                     payload = {"error": str(e)}
+                except Exception as e:
+                    # Anything else is ours to fix, not the visitor's to read. A driver
+                    # error printed the failing SQL and its bound parameters straight
+                    # into the chat window.
+                    print(f"{name} failed: {type(e).__name__}: {e}")
+                    message = (
+                        f"Something went wrong running {name.replace('_', ' ')}. "
+                        f"The other measurements and the float pages still work."
+                    )
+                    function_results.append(
+                        {"function": name, "error": message, "parameters": args}
+                    )
+                    payload = {"error": message}
 
             messages.append(
                 {

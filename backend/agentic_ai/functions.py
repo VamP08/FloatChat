@@ -19,10 +19,11 @@ from typing import Any, Dict, List
 from .config import AgenticConfig
 
 REGION_NAMES = sorted(AgenticConfig.REGIONS)
-PARAMETER_NAMES = [
-    "temperature", "salinity", "oxygen", "chlorophyll", "nitrate", "ph",
-    "backscatter", "pressure",
-]
+# Taken from the same synonym table the engine resolves against. Written out by hand,
+# this list once offered the model "backscatter" while the engine only knew "bbp700",
+# so the name reached Postgres as a column and the visitor was shown
+# "column m.backscatter does not exist".
+PARAMETER_NAMES = [words[0] for words in AgenticConfig.PARAMETER_SYNONYMS.values()]
 
 _REGION = {
     "type": ["string", "null"],
