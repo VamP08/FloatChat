@@ -15,8 +15,8 @@ export default function WakingNotice() {
     >
       <p className="font-semibold">Waking the server</p>
       <p className="text-slate-300">
-        The API sleeps when nobody is using it. First request takes about 30 seconds;
-        everything after that is immediate.
+        The API sleeps when nobody is using it. This takes about half a minute, it is
+        retrying on its own, and everything after it is immediate.
       </p>
     </div>
   );

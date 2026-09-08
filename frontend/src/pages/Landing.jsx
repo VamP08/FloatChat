@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { warmBackend } from "../api/client";
 import DriftField from "../components/DriftField";
 import trackData from "../data/tracks.json";
 import { describe, PARAMETER_KEYS } from "../parameters";
@@ -20,6 +21,11 @@ const ENTRANCES = [
 export default function Landing() {
   const [question, setQuestion] = useState("");
   const navigate = useNavigate();
+
+  // This page needs no API of its own, so it renders immediately either way. Poking the
+  // health endpoint on arrival means the sleeping container starts booting while the
+  // visitor reads, instead of when they click through.
+  useEffect(warmBackend, []);
 
   const ask = (event) => {
     event.preventDefault();
