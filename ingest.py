@@ -488,9 +488,11 @@ def emit_tracks(engine, destination: Path = TRACKS_PATH) -> dict:
     tracks = []
     for float_id, entry in grouped.items():
         path = entry["path"]
-        # The hero draws these a few hundred pixels wide, so more than ~80 points per
-        # float is detail nobody can see and payload nobody should pay for.
-        step = max(1, len(path) // 80)
+        # Enough points that a drift path reads as a continuous wake rather than a
+        # thread. Eighty was too few: the field looked like fine scratches instead of
+        # light. This roughly doubles the file, which gzip absorbs, and the landing
+        # chunk it sits in no longer carries Leaflet, Recharts or the Markdown renderer.
+        step = max(1, len(path) // 170)
         kept = path[::step]
         if kept[-1] != path[-1]:
             kept.append(path[-1])

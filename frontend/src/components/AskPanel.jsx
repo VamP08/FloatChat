@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FiSend, FiX } from 'react-icons/fi';
 import { fetchChatExamples, sendChatMessage } from '../api/client';
+import Answer from './Answer';
 import ChatVisualization from './ChatVisualization';
 
 const WELCOME =
@@ -13,14 +14,18 @@ function Message({ sender, text, visualization }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : ''}`}>
       <div
-        className={`max-w-[92%] rounded-sm p-3 ${
+        className={`rounded-sm p-3 ${isUser ? "max-w-[92%]" : "w-full"} ${
           isUser
             ? 'bg-[var(--action)] text-[#02120d]'
             : 'border border-[var(--sea-edge)] bg-[var(--sea-panel)] text-[var(--ink)]'
         }`}
       >
         {!isUser && <p className="micro mb-1.5">FloatChat</p>}
-        <p className="whitespace-pre-line text-sm leading-relaxed">{text}</p>
+        {isUser ? (
+          <p className="whitespace-pre-line text-sm leading-relaxed">{text}</p>
+        ) : (
+          <Answer>{text}</Answer>
+        )}
         {visualization && <ChatVisualization visualization={visualization} />}
       </div>
     </div>
@@ -35,7 +40,7 @@ function Message({ sender, text, visualization }) {
  * opens over the dossier or the map instead of replacing them.
  */
 export default function AskPanel({ open, onClose, initialQuestion }) {
-  const [messages, setMessages] = useState([{ id: 1, sender: 'ai', text: WELCOME }]);
+  const [messages, setMessages] = useState([]);
   const [examples, setExamples] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -115,38 +120,46 @@ export default function AskPanel({ open, onClose, initialQuestion }) {
         </button>
       </div>
 
-      <div className="flex-grow space-y-4 overflow-y-auto p-5">
-        {messages.map((m) => (
-          <Message key={m.id} sender={m.sender} text={m.text} visualization={m.visualization} />
-        ))}
-        {isLoading && (
-          <div className="rounded-sm border border-[var(--sea-edge)] bg-[var(--sea-panel)] p-3">
-            <p className="animate-pulse text-sm text-[var(--ink-dim)]">
-              Querying the database&hellip;
-            </p>
+      <div className="flex-grow overflow-y-auto p-5">
+        {messages.length === 0 ? (
+          // Nothing asked yet. The greeting and the openers belong in the middle of the
+          // waiting panel rather than pinned to its two ends with a void between them.
+          <div className="flex h-full flex-col justify-center gap-6">
+            <p className="text-sm leading-relaxed text-[var(--ink-dim)]">{WELCOME}</p>
+            {examples.length > 0 && (
+              <div className="flex flex-col items-start gap-2">
+                {examples.slice(0, 4).map((example) => (
+                  <button
+                    key={example}
+                    onClick={() => send(example)}
+                    disabled={isLoading}
+                    className="rounded-sm border border-[var(--sea-edge)] bg-[var(--sea-deep)]
+                               px-3 py-2 text-left text-xs leading-relaxed text-[var(--ink-dim)]
+                               transition-colors hover:border-[var(--action)]
+                               hover:text-[var(--ink)] disabled:opacity-40"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((m) => (
+              <Message key={m.id} sender={m.sender} text={m.text} visualization={m.visualization} />
+            ))}
+            {isLoading && (
+              <div className="rounded-sm border border-[var(--sea-edge)] bg-[var(--sea-panel)] p-3">
+                <p className="animate-pulse text-sm text-[var(--ink-dim)]">
+                  Querying the database&hellip;
+                </p>
+              </div>
+            )}
+            <div ref={endRef} />
           </div>
         )}
-        <div ref={endRef} />
       </div>
-
-      {messages.length <= 1 && examples.length > 0 && (
-        <div className="border-t border-[var(--sea-edge)] p-4">
-          <div className="flex flex-wrap gap-2">
-            {examples.slice(0, 3).map((example) => (
-              <button
-                key={example}
-                onClick={() => send(example)}
-                disabled={isLoading}
-                className="rounded-full border border-[var(--sea-edge)] bg-[var(--sea-deep)]
-                           px-3 py-1.5 text-left text-xs text-[var(--ink-dim)] transition-colors
-                           hover:text-[var(--ink)] disabled:opacity-40"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="border-t border-[var(--sea-edge)] bg-[var(--sea-deep)] p-4">
         <div className="relative">

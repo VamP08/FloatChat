@@ -14,6 +14,31 @@ const EMISSION = {
   nitrate: '#5b8cff', bbp700: '#c7a4ff', ph: '#ff7bd5',
 };
 
+// Instrument names as they appear in the float's metadata, and what each one measures.
+const SENSOR_MEASURES = {
+  OPTODE_DOXY: 'doxy',
+  FLUOROMETER_CHLA: 'chla',
+  BACKSCATTERINGMETER_BBP700: 'bbp700',
+  SPECTROPHOTOMETER_NITRATE: 'nitrate',
+  TRANSISTOR_PH: 'ph',
+};
+
+/**
+ * Instruments this float carries whose readings never passed quality control.
+ *
+ * The sensor list says what is bolted to the float. Coverage says what survived. Three
+ * of the 83 floats carry an oxygen optode and report no usable oxygen at all, and
+ * without this the interface just quietly offers fewer measurements than the float
+ * appears to have.
+ */
+function silentSensors(sensorsList, coverage) {
+  const measured = new Set(coverage.map((entry) => entry.parameter));
+  return (sensorsList || '')
+    .split(',')
+    .map((name) => SENSOR_MEASURES[name.trim()])
+    .filter((parameter) => parameter && !measured.has(parameter));
+}
+
 /** The float's own drift, on its own map, framed to itself. */
 function TraceMap({ dives }) {
   const path = dives
@@ -122,6 +147,7 @@ export default function Dossier({ floatId }) {
 
   const dive = dives.find((d) => d.id === selectedDive);
   const available = presentIn(measurements);
+  const silent = silentSensors(details?.sensors_list, coverage);
 
   return (
     <article className="mx-auto max-w-4xl px-8 pb-28 pt-8">
@@ -172,10 +198,25 @@ export default function Dossier({ floatId }) {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-[var(--ink-faint)]">
-            Readings that passed quality control. A sensor whose readings failed does not
-            appear here, however many it took.
+          <p className="mt-3 text-xs leading-relaxed text-[var(--ink-faint)]">
+            Readings that passed quality control.
           </p>
+
+          {silent.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-[var(--ink-faint)]">
+              This float also carries {silent.length === 1 ? 'an' : ''}{' '}
+              {silent.map((parameter, index) => (
+                <span key={parameter}>
+                  {index > 0 && (index === silent.length - 1 ? ' and ' : ', ')}
+                  <span style={{ color: EMISSION[parameter] }}>
+                    {describe(parameter).name.toLowerCase()}
+                  </span>
+                </span>
+              ))}{' '}
+              {silent.length === 1 ? 'sensor' : 'sensors'}, but none of those readings
+              passed quality control, so none of it is here.
+            </p>
+          )}
         </section>
       )}
 
@@ -218,8 +259,14 @@ export default function Dossier({ floatId }) {
 
           {mode === 'record' ? (
             seriesLoading ? (
-              <p className="mt-6 text-[var(--ink-dim)]">Loading every reading&hellip;</p>
+              <p className="mt-6 text-[var(--ink-dim)]">Loading the record&hellip;</p>
             ) : (
+              <>
+              <p className="mt-2 text-sm text-[var(--ink-dim)]">
+                Every reading this float took in the top 200 metres, where a season is
+                visible. Deeper water changes little from month to month, and plotting the
+                whole column at once produces a cloud rather than a series.
+              </p>
               <div className="mt-2 grid gap-x-8 sm:grid-cols-2">
                 {presentIn(series).map((key) => (
                   <MiniTimeSeriesChart
@@ -230,6 +277,7 @@ export default function Dossier({ floatId }) {
                   />
                 ))}
               </div>
+              </>
             )
           ) : available.length === 0 ? (
             <p className="mt-6 text-[var(--ink-dim)]">

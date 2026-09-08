@@ -64,6 +64,16 @@ def read_float_trajectory(float_id: str, db: Session = Depends(database.get_db))
 
 
 @router.get("/{float_id}/timeseries", response_model=List[schemas.TimeSeriesData])
-def read_float_timeseries(float_id: str, db: Session = Depends(database.get_db)):
-    """The float's full measurement history for time-series plotting."""
-    return crud.get_full_timeseries_by_float(db, float_id=float_id)
+def read_float_timeseries(
+    float_id: str,
+    depth_max: float | None = 200,
+    db: Session = Depends(database.get_db),
+):
+    """This float's readings over time, down to depth_max decibar.
+
+    Defaults to the top 200 dbar, the layer where a season is visible. Pass
+    depth_max=0 for the whole column, which for the longest records is 44,310 readings.
+    """
+    return crud.get_full_timeseries_by_float(
+        db, float_id=float_id, depth_max=depth_max or None
+    )

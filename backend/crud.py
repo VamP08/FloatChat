@@ -130,9 +130,15 @@ def get_profiles_with_data_by_float(db: Session, float_id: str):
     )
 
 
-def get_full_timeseries_by_float(db: Session, float_id: str):
-    """Every measurement this float ever reported, in time order."""
-    return (
+def get_full_timeseries_by_float(db: Session, float_id: str, depth_max: float | None = None):
+    """This float's readings over time, in time order.
+
+    Bounded by depth because the whole water column plotted on one axis is a cloud
+    rather than a series: the longest record here is 44,310 readings, which is several
+    megabytes of JSON and a scatter plot dense enough to look broken. One layer of water
+    over twelve years is both readable and quick.
+    """
+    query = (
         db.query(
             models.Profile.profile_date,
             models.Measurement.pressure,
@@ -144,6 +150,9 @@ def get_full_timeseries_by_float(db: Session, float_id: str):
         )
         .join(models.Measurement, models.Measurement.profile_id == models.Profile.id)
         .filter(models.Profile.float_id == float_id)
-        .order_by(models.Profile.profile_date, models.Measurement.pressure)
-        .all()
     )
+    if depth_max is not None:
+        query = query.filter(models.Measurement.pressure <= depth_max)
+    return query.order_by(
+        models.Profile.profile_date, models.Measurement.pressure
+    ).all()
