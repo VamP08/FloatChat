@@ -7,8 +7,6 @@ this file, with user-supplied values bound as parameters rather than interpolate
 """
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
-import json
-import numpy as np
 from sqlalchemy import create_engine, text
 from .config import AgenticConfig
 
