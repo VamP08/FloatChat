@@ -1,138 +1,139 @@
 # FloatChat
 
-Ask a question in plain English about 1.75 million quality-controlled ocean measurements
-and get the answer with the chart behind it.
+**[floatchat-live.vercel.app](https://floatchat-live.vercel.app)**
 
-The data comes from Argo — a global array of robotic floats that drift with the currents,
-sink to two kilometres, and rise every ten days measuring the water on the way up. This
-covers 83 biogeochemical floats in the northern Indian Ocean, from 2014 to 2026.
+Eighty-three robotic floats have been drifting around the northern Indian Ocean since
+2014, sinking to two kilometres and rising every ten days to measure the water on the way
+up. This puts everything they recorded on a map, on a page per float, and behind a box you
+can type a question into.
 
-![The landing page: 83 float drift paths drawn as bioluminescent wakes](assets/landing.png)
+![The landing page, showing every float's drift path](assets/landing.png)
 
----
+The data is from Argo, an international programme that publishes its measurements free.
+Getting it into a state where you can query it is most of the work, and that part is
+described below.
 
-## What is actually interesting here
+## Asking it something
 
-**The language model never writes SQL.** It chooses one of four declared functions and
-supplies typed arguments — a region, a date range, a depth band — and every statement
-that reaches the database is assembled from a template in
-[`backend/agentic_ai/sql_engine.py`](backend/agentic_ai/sql_engine.py) with those values
-bound rather than interpolated.
+The chat runs on a language model, but the model never writes SQL. It picks one of four
+declared operations and fills in typed arguments: a region, a date range, a depth band.
+The query itself comes from a template in
+[`sql_engine.py`](backend/agentic_ai/sql_engine.py) with those values bound.
 
-A question about the Pacific raises `UnsupportedRegion` and says there is no data, instead
-of silently dropping the spatial filter and answering with the wrong ocean. That failure
-mode — a confident wrong answer rather than a crash — is the reason the query layer works
-this way.
+Ask about the Pacific and it tells you there is no data there. That sounds obvious, but the
+first version did the opposite. When the region lookup missed, it quietly dropped the
+spatial filter and answered from the whole database, so a question about the North Pacific
+came back with the average of 79,470 Indian Ocean measurements and no warning anywhere. A
+language model handed those rows writes a confident, fluent, wrong answer. That failure is
+why the query layer works the way it does, and the region list is now an enum the API
+rejects before the call is even returned.
 
-**Getting usable data out of Argo is most of the engineering.** Every parameter is
-published twice, raw and calibrated, each with its own quality flag, and the two can
-disagree inside a single dive. `ingest.py` resolves that per parameter: the adjusted value
-where it passes QC, the raw value where it does not, and nothing that is not flagged 1 or
-2.
+![Asking a question, with the chart behind the answer](assets/ask.png)
 
-That rule matters more than it sounds. Float 2902306 carries oxygen, nitrate, pH and
-backscatter sensors, and reports 4,604 finite oxygen values and 73,147 finite pH values —
-every one of them flagged "probably bad" because the sensors are still in real-time mode.
-A naive "use the adjusted values" pipeline ships a database whose biogeochemistry columns
-are silently empty. Three of the 83 floats are in this state, and the interface says so
-rather than offering an empty chart.
+## Quality control, which is the actual problem
 
----
+Argo publishes every measurement twice: the raw reading, and an adjusted one that has been
+through calibration. Both carry a quality flag, and the two can disagree inside a single
+dive, because the calibration state is per sensor rather than per profile.
 
-## The interface
+The obvious rule is to take the adjusted values wherever the flag is good. I tried that
+first, on float 2902306, and got zero oxygen, zero nitrate, zero pH, zero backscatter. The
+readings are there: 4,604 oxygen values, 73,147 pH values. Every one is flagged 3,
+"probably bad", because those sensors are still in real time mode waiting for delayed mode
+calibration.
 
-One screen: a float chooser, and either the whole ocean or one float read top to bottom.
+Had I trusted the sensor list and shipped, the database would have had empty columns for
+four of the seven measurements, and it would have looked like a bug in my code. So the rule
+is per parameter: the adjusted value where it passes, the raw value where it passes,
+nothing otherwise. Coverage is then measured per float during ingest and stored, rather
+than inferred from what instruments are aboard. Three of the 83 floats end up with no
+usable biogeochemistry, and the interface says which ones and why instead of drawing an
+empty chart.
 
-![One float's dossier: drift trace, coverage, and its dives on a timeline](assets/dossier.png)
+## Reading one float
 
-Colour carries meaning rather than decoration. Each float is drawn in the colour of the
-measurement it holds the most of, using the emission peaks of real bioluminescent marine
-organisms; floats whose sensors failed quality control have no colour at all. Data marks
-emit light, text never does, which keeps every string at full contrast.
+Pick a float and you get its whole record on one page: where it drifted over twelve years,
+what it measured, every dive it made on a timeline, and the numbers from whichever dive you
+choose.
 
-![Depth profiles for one dive, each parameter in its own emission colour](assets/profiles.png)
+![One float's page, with its drift trace, coverage and dives](assets/dossier.png)
 
----
+Colour means something here. Each float is drawn in the colour of the measurement it holds
+the most of, using the emission peaks of real bioluminescent organisms, roughly 460 to
+700 nm. Floats whose sensors failed quality control have no colour at all, so the dark
+paths on the landing page are the gaps in the record. Data marks glow; text never does,
+which keeps every string readable.
 
-## What is in the database, and what is not
+## What is in it
 
-|  |  |
+| | |
 |---|---|
 | Floats | 83 |
 | Dives | 13,026 |
 | Measurements | 1,749,899 |
-| Period | March 2014 – September 2026 |
-| Area | 10°S–26°N, 40°E–100°E |
-| Parameters | temperature, salinity, dissolved oxygen, chlorophyll, nitrate, particle backscatter, pH |
+| Period | March 2014 to September 2026 |
+| Area | 10°S to 26°N, 40°E to 100°E |
+| Measured | temperature, salinity, dissolved oxygen, chlorophyll, nitrate, particle backscatter, pH |
 
-There is **no data for any other ocean**. No Pacific, no Atlantic, no Mediterranean, no
+There is no data for any other ocean. No Pacific, no Atlantic, no Mediterranean, no
 Southern Ocean.
 
-Two things worth knowing before reading a number:
-
-- **Profiles are binned onto standard pressure levels** at ingest — 5 dbar to 200 m, 10 to
-  1000, 25 to 2000. A stored value is the mean of the readings within that level, not a
-  raw reading. `ingest.py --resolution raw` builds the full-resolution database instead.
-- **Nitrate returns roughly a seventh as many values** as the other parameters. That is the
-  sensor's lower vertical sampling rate, not a defect.
-
----
+Two things to know before reading a number off a chart. Profiles are averaged onto standard
+pressure levels during ingest, 5 dbar down to 200 m and coarser below, so a stored value is
+the mean of the readings inside that level rather than a raw reading. And nitrate comes
+back with about a seventh as many values as the other measurements, which is the sensor's
+sampling rate rather than a fault.
 
 ## Running it
 
-Requires Python 3.12+ and Node 20+.
+Python 3.12 and Node 20.
 
 ```bash
-# API — serves the 8-float database committed under data/
 pip install -r backend/requirements.txt
 python -m uvicorn backend.main:app --reload
 
-# Interface
 cd frontend && npm install && npm run dev
 ```
 
-That is the whole setup. No database to provision, no keys: the map, the float dossiers
-and the charts all work against the committed SQLite. Only the chat needs a key —
-copy `.env.example` to `.env` and add a [Groq](https://console.groq.com/keys) one.
+That is the whole setup. The repository carries a small SQLite database of 8 floats, so the
+map, the float pages and the charts work with no database to provision and no keys. Only
+the chat needs a key: copy `.env.example` to `.env` and add a
+[Groq](https://console.groq.com/keys) one.
 
-### Rebuilding the database from source
+### Rebuilding the database
 
 ```bash
 pip install -r requirements-ingest.txt
 
-python ingest.py --self-check        # assertions on the QC rule and the binning
-python ingest.py --demo              # 8 floats  -> data/argo_demo.sqlite
-python ingest.py --dsn <postgres-url>   # all 83  -> Postgres
+python ingest.py --self-check           # assertions on the QC rule and the binning
+python ingest.py --demo                 # 8 floats  -> data/argo_demo.sqlite
+python ingest.py --dsn <postgres-url>   # all 83    -> Postgres
 ```
 
-Every build drops and recreates the schema. `--demo` therefore always writes the local
-file and never inherits `DATABASE_URL`, and rebuilding a non-SQLite database that already
-holds measurements requires `--replace`.
+`ingest.py` reads the Argo GDAC's synthetic profile index, picks the floats inside a
+bounding box, downloads one metadata file and one profile file each, applies the quality
+control above, averages onto standard levels, and loads Postgres or SQLite. Downloads are
+cached under `.argo-cache/`, so a second run costs nothing. The full 83 float load takes
+about six minutes.
 
-**Load through the direct endpoint, not the pooled one.** Neon offers both; the pooled
-host has `-pooler` in its name and exists to multiplex short-lived serverless connections,
-which is what the deployed API wants. A bulk load through it measured 673 rows/s against
-1,468 on the direct host, because the pooler does not pipeline. Drop `-pooler` from the
-host for the ingest and keep it for `DATABASE_URL` on Render.
+Every build drops and recreates the schema, so `--demo` always writes the local file and
+never inherits `DATABASE_URL`, and rebuilding a populated non-SQLite database needs
+`--replace`.
 
-`ingest.py` reads the Argo GDAC's synthetic-profile index, selects floats inside a
-bounding box, downloads one `_meta.nc` and one `_Sprof.nc` per float, applies the quality
-control above, bins the profiles, and writes to Postgres or SQLite. Downloads are cached
-under `.argo-cache/`, so a second run costs nothing.
+Load through the direct database endpoint rather than a pooled one. A pooled connection
+does not pipeline, and the same load measured 673 rows per second through it against 1,468
+direct. Keep the pooled endpoint for the deployed API, which is what it is for.
 
 A full build also rewrites `frontend/src/data/tracks.json`, which is what the landing page
-draws and counts. That is deliberate: the marketing surface cannot claim more floats than
-the database it sits in front of. `--demo` skips it, so a local convenience build cannot
-cut the published page down to eight floats. `--tracks-only` regenerates it alone.
-
----
+draws and counts. That is deliberate: the front page cannot claim more floats than the
+database behind it holds. `--tracks-only` regenerates that file alone.
 
 ## Deploying
 
-The API is a [Render](https://render.com) blueprint (`render.yaml`); the interface is a
-static Vite build on [Vercel](https://vercel.com) (`frontend/vercel.json`). The database is
-Postgres — [Neon](https://neon.com)'s free tier fits the full 83-float set at roughly
-210 MB.
+The API is a [Render](https://render.com) blueprint (`render.yaml`), the interface is a
+static Vite build on [Vercel](https://vercel.com) (`frontend/vercel.json`), and the database
+is Postgres on [Neon](https://neon.com), where the full set sits at roughly 210 MB inside
+the free 0.5 GB.
 
 | Where | Variable | |
 |---|---|---|
@@ -141,29 +142,28 @@ Postgres — [Neon](https://neon.com)'s free tier fits the full 83-float set at 
 | Render | `CORS_ORIGINS` | the deployed frontend's origin |
 | Vercel | `VITE_API_URL` | the deployed API's origin |
 
-The API is not kept awake. One Render workspace has 750 free instance-hours a month across
-every service, and exceeding that suspends all of them, so a first request after an idle
-spell waits through a cold start of roughly half a minute. The interface says so rather
-than showing a spinner that looks broken.
+The API sleeps after fifteen idle minutes and is not kept awake, because one Render
+workspace gets 750 free instance hours a month across every service and going over suspends
+all of them. Waking takes about half a minute, and the platform answers with a gateway
+error while it boots rather than holding the connection open, so reads retry through it on
+a backoff. The landing page needs no API at all, which means it paints immediately and the
+container starts waking while you read it.
 
-The chat endpoint is rate limited per client address, because it is public and every call
-spends a paid API key.
-
----
+The chat endpoint is rate limited to 20 questions per five minutes per address, since it is
+public and every call spends an API key.
 
 ## Data
 
 Collected by the international Argo programme and made freely available by the Coriolis
 Global Data Assembly Centre. Argo is part of the Global Ocean Observing System.
 
----
+## Where this came from
 
-## Origin
+It started as an internal university hackathon project built with Mohammed Lokhandwala and
+the team, where it came second. The natural language query layer dates from then.
 
-This began as an internal university hackathon project built with Mohammed Lokhandwala and
-the team, where it placed second. The natural-language query layer dates from then.
-
-Everything since is a rebuild: the ingestion pipeline and its quality-control rules, the
-move to Postgres, the interface, the deployment, and the corrections along the way — the
-query layer used to answer questions about the Pacific with Indian Ocean measurements, and
-the standard-deviation branch had never once executed.
+Everything after that is a rebuild: the ingestion pipeline and its quality control rules,
+the move to Postgres, the interface, and the deployment. Along the way the query layer
+turned out to answer questions about the Pacific using Indian Ocean measurements, the
+standard deviation branch had never once executed on any input, and every depth chart was
+drawing a flat line across the top of its frame.
