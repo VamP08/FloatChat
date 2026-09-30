@@ -30,11 +30,3 @@ dist/
 .DS_Store
 .idea/
 .vscode/
-
-# Local tooling configuration
-.impeccable/
-.playwright-mcp/
-
-# Impeccable product/design records are engineering notes, kept in the private docs repo
-PRODUCT.md
-DESIGN.md
