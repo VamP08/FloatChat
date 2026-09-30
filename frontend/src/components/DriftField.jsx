@@ -21,6 +21,13 @@ import trackData from "../data/tracks.json";
  * Four passes per band, widest and faintest first, build the bloom. Paths are drawn as
  * curves through segment midpoints because a float's drift loops and meanders, and
  * straight chords between sampled positions read as noise.
+ *
+ * What it costs: the bloom is a few hundred wide additive strokes, too heavy to repeat
+ * every frame, and it never changes once revealed. So it has a canvas of its own that
+ * is drawn once per reveal step and then left alone, and the lit wake goes on a clear
+ * canvas above it, added by the compositor with plus-lighter, the same sum `lighter`
+ * makes inside a canvas. A frame touches only that clear canvas. The loop sleeps when
+ * nothing is lit and the pointer is away, and while the canvas is off screen.
  */
 
 // Emission peaks of real marine organisms, matching the parameter palette in world.css.
@@ -60,16 +67,22 @@ const BLOOM = [
   { width: 0.8, alpha: 0.34 },
 ];
 const EXCITE_RADIUS = 150;
+// Per 60 Hz frame. Scaled by elapsed time, so the glow lasts as long on a 120 Hz
+// screen or a machine that drops frames.
 const EXCITE_DECAY = 0.93;
+const FRAME_MS = 1000 / 60;
 const CELL = 64;
 
 export default function DriftField({ className = "" }) {
   const canvasRef = useRef(null);
+  const glowRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const glow = glowRef.current;
+    if (!canvas || !glow) return;
     const ctx = canvas.getContext("2d", { alpha: false });
+    const glowCtx = glow.getContext("2d");
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let layers = [];
@@ -79,8 +92,13 @@ export default function DriftField({ className = "" }) {
     let width = 0;
     let height = 0;
     let frame = 0;
+    let last = 0;
+    let visible = true;
     let reveal = reduceMotion ? BANDS : 0;
     const pointer = { x: -9999, y: -9999, active: false };
+    // How many bands the bloom canvas holds; -1 means it needs drawing.
+    let fieldBands = -1;
+    let glowing = false;
 
     function project() {
       const rect = canvas.getBoundingClientRect();
@@ -88,9 +106,12 @@ export default function DriftField({ className = "" }) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = rect.width;
       height = rect.height;
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
+      canvas.width = glow.width = Math.round(width * dpr);
+      canvas.height = glow.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      glowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fieldBands = -1;
+      glowing = false;
 
       const scale = Math.max(
         width / (BOUNDS.lonMax - BOUNDS.lonMin),
@@ -132,7 +153,7 @@ export default function DriftField({ className = "" }) {
           const [cx, cy] = points[i];
           run.quadraticCurveTo(px, py, (px + cx) / 2, (py + cy) / 2);
 
-          segments.push({ x: px, y: py, x2: cx, y2: cy, rgb, strength });
+          segments.push({ x: px, y: py, x2: cx, y2: cy, color: rgb.join(), strength });
         }
       });
 
@@ -162,7 +183,7 @@ export default function DriftField({ className = "" }) {
       return found;
     }
 
-    function draw() {
+    function renderField(bands) {
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = "#03070c";
       ctx.fillRect(0, 0, width, height);
@@ -174,7 +195,7 @@ export default function DriftField({ className = "" }) {
 
       for (const pass of BLOOM) {
         for (const layer of layers) {
-          if (layer.band > reveal) continue;
+          if (layer.band > bands) continue;
           const level = (layer.band + 1) / BANDS;
           const [r, g, b] = layer.rgb;
           ctx.strokeStyle = `rgba(${r},${g},${b},${(pass.alpha * level).toFixed(4)})`;
@@ -182,29 +203,51 @@ export default function DriftField({ className = "" }) {
           ctx.stroke(layer.path);
         }
       }
+      ctx.globalCompositeOperation = "source-over";
+      fieldBands = bands;
+    }
 
-      // The disturbance response, drawn only where it exists.
+    // Returns whether anything is still lit, so the loop knows when it can sleep.
+    function draw() {
+      if (width === 0) return false;
+      const bands = Math.floor(Math.min(reveal, BANDS));
+      if (bands !== fieldBands) renderField(bands);
+
+      // An untouched glow canvas costs nothing to composite; only clear it when it has
+      // something on it.
+      let lit = false;
+      if (glowing) glowCtx.clearRect(0, 0, width, height);
+
+      // The disturbance response, drawn only where it exists. One stroke per segment,
+      // so crossing wakes add up here too.
+      glowCtx.globalCompositeOperation = "lighter";
+      glowCtx.lineCap = "round";
       for (let i = 0; i < energy.length; i += 1) {
         const charge = energy[i];
         if (charge < 0.02) continue;
+        lit = true;
         const seg = segments[i];
-        const [r, g, b] = seg.rgb;
-        ctx.strokeStyle = `rgba(${r},${g},${b},${(charge * 0.5).toFixed(3)})`;
-        ctx.lineWidth = 1 + charge * 3.5;
-        ctx.beginPath();
-        ctx.moveTo(seg.x, seg.y);
-        ctx.lineTo(seg.x2, seg.y2);
-        ctx.stroke();
+        glowCtx.strokeStyle = `rgba(${seg.color},${(charge * 0.5).toFixed(3)})`;
+        glowCtx.lineWidth = 1 + charge * 3.5;
+        glowCtx.beginPath();
+        glowCtx.moveTo(seg.x, seg.y);
+        glowCtx.lineTo(seg.x2, seg.y2);
+        glowCtx.stroke();
       }
-
-      ctx.globalCompositeOperation = "source-over";
+      glowCtx.globalCompositeOperation = "source-over";
+      glowing = lit;
+      return lit;
     }
 
-    function tick() {
-      if (reveal < BANDS) reveal += 0.11;
+    function tick(now) {
+      // Elapsed time in 60 Hz frames, capped so a backgrounded tab does not jump.
+      const steps = last ? Math.min(now - last, 100) / FRAME_MS : 1;
+      last = now;
+      if (reveal < BANDS) reveal += 0.11 * steps;
 
+      const decay = EXCITE_DECAY ** steps;
       for (let i = 0; i < energy.length; i += 1) {
-        if (energy[i] > 0.002) energy[i] *= EXCITE_DECAY;
+        if (energy[i] > 0.002) energy[i] *= decay;
         else energy[i] = 0;
       }
 
@@ -214,20 +257,33 @@ export default function DriftField({ className = "" }) {
           const distance = Math.hypot(seg.x - pointer.x, seg.y - pointer.y);
           if (distance < EXCITE_RADIUS) {
             const falloff = 1 - distance / EXCITE_RADIUS;
-            energy[index] = Math.min(1, energy[index] + falloff * falloff * 0.55);
+            energy[index] = Math.min(1, energy[index] + falloff * falloff * 0.55 * steps);
           }
         }
       }
 
-      draw();
-      frame = requestAnimationFrame(tick);
+      const lit = draw();
+      if (visible && (lit || pointer.active || reveal < BANDS)) {
+        frame = requestAnimationFrame(tick);
+      } else {
+        frame = 0;
+        last = 0;
+      }
+    }
+
+    function wake() {
+      if (!frame && visible) frame = requestAnimationFrame(tick);
     }
 
     function handleMove(event) {
       const rect = canvas.getBoundingClientRect();
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top;
-      pointer.active = true;
+      // Within reach of the field, a resting pointer keeps its wake lit, as before.
+      pointer.active =
+        pointer.x > -EXCITE_RADIUS && pointer.x < width + EXCITE_RADIUS &&
+        pointer.y > -EXCITE_RADIUS && pointer.y < height + EXCITE_RADIUS;
+      if (pointer.active) wake();
     }
 
     function handleLeave() {
@@ -238,36 +294,52 @@ export default function DriftField({ className = "" }) {
     if (reduceMotion) {
       draw();
     } else {
-      frame = requestAnimationFrame(tick);
+      wake();
       window.addEventListener("pointermove", handleMove);
-      canvas.addEventListener("pointerleave", handleLeave);
+      document.documentElement.addEventListener("pointerleave", handleLeave);
     }
 
     const observer = new ResizeObserver(() => {
       project();
-      if (reduceMotion) draw();
+      if (reduceMotion || !frame) draw();
     });
     observer.observe(canvas);
+
+    // Nothing to animate while the hero is scrolled away.
+    const sight = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible && !reduceMotion) wake();
+    });
+    sight.observe(canvas);
 
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      sight.disconnect();
       window.removeEventListener("pointermove", handleMove);
-      canvas.removeEventListener("pointerleave", handleLeave);
+      document.documentElement.removeEventListener("pointerleave", handleLeave);
     };
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={className}
-      role="img"
-      aria-label={
-        `Drift paths of ${trackData.stats.floats} Argo floats across the northern ` +
-        `Indian Ocean between ${trackData.stats.first} and ${trackData.stats.last}. ` +
-        `Each path is coloured by the measurement that float carries most of, and ` +
-        `fades backwards into its own history.`
-      }
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className={className}
+        role="img"
+        aria-label={
+          `Drift paths of ${trackData.stats.floats} Argo floats across the northern ` +
+          `Indian Ocean between ${trackData.stats.first} and ${trackData.stats.last}. ` +
+          `Each path is coloured by the measurement that float carries most of, and ` +
+          `fades backwards into its own history.`
+        }
+      />
+      <canvas
+        ref={glowRef}
+        className={`pointer-events-none ${className}`}
+        style={{ mixBlendMode: "plus-lighter" }}
+        aria-hidden="true"
+      />
+    </>
   );
 }
