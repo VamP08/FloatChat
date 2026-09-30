@@ -5,7 +5,7 @@ The language model never writes SQL. It chooses one of a fixed set of functions 
 supplies typed arguments; every statement executed here is assembled from templates in
 this file, with user-supplied values bound as parameters rather than interpolated.
 """
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 from .config import AgenticConfig
@@ -462,7 +462,6 @@ class SQLTemplateEngine:
         """Generate a human-readable trend summary"""
         anomaly_rate = float(row[1]) if row[1] else 0
         total_months = int(row[2])
-        period_avg = float(row[3]) if row[3] else 0
         anomaly_count = int(row[7]) if row[7] else 0
 
         summary = f"Analyzed {total_months} months of data. "
@@ -494,7 +493,6 @@ class SQLTemplateEngine:
     def query_profile_data(self, **kwargs) -> List[Dict[str, Any]]:
         """Query detailed profile data"""
         parameters = kwargs.get('parameters', [])
-        profile_type = kwargs.get('profile_type', 'vertical')
         # The tool schema calls this 'limit'; the original signature called it
         # 'max_profiles'. Accept both so neither name silently does nothing.
         max_profiles = kwargs.get('limit') or kwargs.get('max_profiles') or 100
@@ -647,7 +645,6 @@ class SQLTemplateEngine:
         """Compare data across regions, time periods, or parameters"""
         comparison_type = kwargs.get('comparison_type', 'regional')
         parameters = kwargs.get('parameters', [])
-        operation = kwargs.get('operation', 'average')
         
         results = []
         

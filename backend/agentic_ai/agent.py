@@ -9,10 +9,9 @@ Groq hosts the model behind an OpenAI-compatible API, so the tool declarations i
 functions.py are plain JSON Schema and the loop below is the standard two-turn tool
 exchange: ask, execute what came back, answer with the results in hand.
 """
-import os
 import json
 from typing import Dict, List, Any, Optional
-from datetime import date, timedelta, datetime
+from datetime import timedelta, datetime
 import asyncio
 
 try:

@@ -98,6 +98,8 @@ export default function AskPanel({ open, onClose, initialQuestion }) {
     if (!open || !initialQuestion || asked.current) return;
     asked.current = true;
     send(initialQuestion);
+    // `send` is new every render; the ref above is what keeps this to one question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialQuestion]);
 
   if (!open) return null;

@@ -15,13 +15,12 @@ import argparse
 import csv
 import gzip
 import json
-import io
 import os
 import sys
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np

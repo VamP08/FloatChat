@@ -187,7 +187,7 @@ def _create_aggregate_visualization(results: List[Dict[str, Any]], params: Dict[
     if not chart_data:
         return None
     
-    title = f"Aggregate Statistics"
+    title = "Aggregate Statistics"
     if params.get('operation'):
         title += f" ({params['operation']})"
     if params.get('region'):
@@ -285,7 +285,6 @@ def _create_comparison_visualization(results: List[Dict[str, Any]], params: Dict
     
     # For comparison queries, we want to show time series data
     # Get the raw data from the SQL engine for time series visualization
-    from ..agentic_ai.agent import OceanographicAgent
     agent = get_agent()
     if not agent:
         return None
@@ -429,15 +428,14 @@ async def handle_chat_message(request: schemas.ChatRequest):
         if not user_message.strip():
             return schemas.ChatMessage(role="ai", content="I didn't receive a message. Please ask me something about the oceanographic data!")
         
-        print(f"🤖 Processing query with agentic AI: {user_message}")
+        print(f"chat query: {user_message}")
         
         # Process the query using the agentic AI
         result = await agent_instance.process_query(user_message)
         
         if result.get('success'):
             ai_response_content = result.get('response', 'I processed your query but couldn\'t generate a response.')
-            print(f"✅ Agentic AI response generated successfully")
-            
+
             # Create visualization data if function results are available
             visualization = None
             if result.get('function_results'):
@@ -463,14 +461,14 @@ async def handle_chat_message(request: schemas.ChatRequest):
                     "Something went wrong answering that. The map, the float pages and "
                     "the charts still work, and they read the same database."
                 )
-            print(f"❌ Agentic AI error: {error_msg}")
+            print(f"chat agent error: {error_msg}")
         
         return schemas.ChatMessage(role="ai", content=ai_response_content)
         
     except Exception as e:
         # Same reasoning as above: a driver or provider message means nothing to a
         # visitor and can carry a table name or a fragment of SQL with it.
-        print(f"💥 Exception in chat handler: {str(e)}")
+        print(f"chat handler failed: {type(e).__name__}: {e}")
         return schemas.ChatMessage(
             role="ai",
             content=(
