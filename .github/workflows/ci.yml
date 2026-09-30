@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx eslint .
+      - run: npm run build
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # The runtime requirements alone, as the deployed container installs them.
+      - run: pip install -r backend/requirements.txt
+      - run: python check_parameters.py
+      - name: Serve the demo database and read every endpoint
+        run: |
+          python -m uvicorn backend.main:app --port 8000 &
+          for i in $(seq 30); do curl -fs localhost:8000/ > /dev/null && break; sleep 1; done
+          get() { curl -fsS "localhost:8000$1"; }
+          count() { get "$1" | python -c "import json, sys; print(len(json.load(sys.stdin)))"; }
+          test "$(count /floats/)" = 8
+          float=$(get /floats/ | python -c "import json, sys; print(json.load(sys.stdin)[0]['id'])")
+          get /floats/$float > /dev/null
+          for path in /floats/locations /floats/locations/active /floats/$float/coverage \
+                      /floats/$float/profiles_with_data /floats/$float/trajectory \
+                      /floats/$float/timeseries /chat/examples; do
+            test "$(count "$path")" -gt 0 || { echo "empty: $path"; exit 1; }
+          done
+          profile=$(get /floats/$float/profiles | python -c "import json, sys; print(json.load(sys.stdin)[0]['id'])")
+          test "$(count /profiles/$profile/measurements)" -gt 0
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/floats/0000000)" = 404
+
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ingest.txt
+      - run: pip install -r requirements-ingest.txt
+      - run: python ingest.py --self-check
