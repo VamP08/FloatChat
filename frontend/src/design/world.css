@@ -14,7 +14,10 @@
  * roughly 460nm to 700nm, rather than a chart library's categorical ramp.
  */
 
-@import url("https://api.fontshare.com/v2/css?f[]=clash-display@600,500&f[]=switzer@400,500,600&display=swap");
+/* One family per request: Fontshare now serves only the first family of a combined
+   request, which left every line of body text in the system fallback. */
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@600,500&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap");
 
 :root {
   /* The sea, by depth. Bioluminescence is a deep-water phenomenon, so surfaces
