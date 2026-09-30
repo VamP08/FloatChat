@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.1 — 2026-09-30
 
-On the live site, not tagged.
+Fixes found while recording the walkthrough.
 
 - Body text loads Switzer again; Fontshare now serves only the first family of a combined
   request, so every line of body text had fallen back to the system font.
