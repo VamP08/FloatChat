@@ -23,7 +23,7 @@ except ImportError:
     GROQ_AVAILABLE = False
 
 from .config import AgenticConfig, UnknownParameter
-from .sql_engine import SQLTemplateEngine, UnsupportedRegion
+from .sql_engine import SQLTemplateEngine, UnknownOperation, UnsupportedRegion
 from .functions import OceanQueryFunctions
 
 
@@ -229,7 +229,7 @@ class OceanographicAgent:
                     bounds = {r: self.config.get_region_bounds(r) for r in named if r}
                     if bounds:
                         payload["region_bounds"] = bounds
-                except (UnsupportedRegion, UnknownParameter) as e:
+                except (UnsupportedRegion, UnknownParameter, UnknownOperation) as e:
                     # Refusals this system raises on purpose. The message names what the
                     # database does hold, which is exactly what the visitor should read.
                     function_results.append(

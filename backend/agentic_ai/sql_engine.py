@@ -22,6 +22,29 @@ class UnsupportedRegion(ValueError):
         )
 
 
+class UnknownOperation(ValueError):
+    """Raised when a query asks for a statistic this engine does not compute."""
+
+    def __init__(self, operation: str):
+        self.operation = operation
+        super().__init__(
+            f"There is no statistic called '{operation}'. This database computes: "
+            f"{', '.join(sorted(AGGREGATES))}."
+        )
+
+
+# The statistics query_aggregate_statistics computes. The operation word reaches the SQL as a
+# literal, so it must be one of these keys: the tool schema's enum was the only guard, and a
+# crafted value such as "x' as parameter --" rewrote the statement.
+AGGREGATES = {
+    'average': 'AVG', 'mean': 'AVG', 'avg': 'AVG',
+    'maximum': 'MAX', 'max': 'MAX',
+    'minimum': 'MIN', 'min': 'MIN',
+    'count': 'COUNT', 'sum': 'SUM',
+    'std': None, 'standard_deviation': None,
+}
+
+
 class SQLTemplateEngine:
     """Deterministic SQL template engine for oceanographic data queries"""
 
@@ -169,7 +192,10 @@ class SQLTemplateEngine:
     
     def query_aggregate_statistics(self, **kwargs) -> List[Dict[str, Any]]:
         """Query aggregate statistics"""
-        operation = kwargs.get('operation', 'average')
+        # The schema lets the model send null, which arrives as None rather than as a missing key.
+        operation = (kwargs.get('operation') or 'average').lower().strip()
+        if operation not in AGGREGATES:
+            raise UnknownOperation(operation)
         parameters = kwargs.get('parameters', [])
         
         if 'all' in parameters:
@@ -206,31 +232,17 @@ class SQLTemplateEngine:
         
         where_clause = " AND ".join(filters) if filters else "1=1"
         
-        # Build aggregate operation
-        agg_ops = {
-            'average': 'AVG',
-            'mean': 'AVG',
-            'avg': 'AVG',
-            'maximum': 'MAX',
-            'max': 'MAX',
-            'minimum': 'MIN',
-            'min': 'MIN',
-            'count': 'COUNT',
-            'sum': 'SUM',
-            'std': 'SQRT(AVG(({param} - avg_val) * ({param} - avg_val)))',
-        }
-        
-        agg_func = agg_ops.get(operation.lower(), 'AVG')
-        
+        agg_func = AGGREGATES[operation]
+
         results = []
-        
+
         with self._get_connection() as conn:
             for param in parameters:
-                
+
                 param_norm = self.config.normalize_parameter(param)
-                
+
                 # Build SQL query with JOIN between profiles and measurements
-                if operation.lower() in ['std', 'standard_deviation']:
+                if agg_func is None:
                     sql = f"""
                     SELECT
                         '{param}' as parameter,
@@ -536,7 +548,9 @@ class SQLTemplateEngine:
         param_columns = []
         for param in parameters:
             param_norm = self.config.normalize_parameter(param)
-            param_columns.append(f"m.{param_norm} as {param}")
+            # Quoted: synonyms such as "dissolved oxygen" contain spaces, and unquoted they
+            # made the statement invalid.
+            param_columns.append(f'm.{param_norm} as "{param}"')
         
         columns_str = ", ".join(param_columns)
         
@@ -596,7 +610,7 @@ class SQLTemplateEngine:
         param_columns = []
         for param in parameters:
             param_norm = self.config.normalize_parameter(param)
-            param_columns.append(f"AVG(m.{param_norm}) as {param}")
+            param_columns.append(f'AVG(m.{param_norm}) as "{param}"')
         
         columns_str = ", ".join(param_columns)
         

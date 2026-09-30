@@ -135,7 +135,7 @@ float pages and the charts read the API directly; only the chat goes through the
   1440×900 on an RTX 4060 laptop it holds 72 fps during a fast sweep and costs nothing at
   rest; a weaker integrated GPU may drop below 60 while the pointer is moving.
 - **Tests.** CI runs the linter, the build, an API smoke test on the demo database, the
-  parameter check and the QC assertions. There are no browser tests.
+  parameter and query checks, and the QC assertions. There are no browser tests.
 
 ## Running it
 
@@ -181,17 +181,24 @@ A full build also rewrites `frontend/src/data/tracks.json`, which is what the la
 draws and counts. That is deliberate: the front page cannot claim more floats than the
 database behind it holds. `--tracks-only` regenerates that file alone.
 
-### One more check
+### Two more checks
 
 ```bash
 python check_parameters.py
+python check_queries.py
 ```
 
 The chat labels a result with the word the question used, so an answer about chlorophyll
 comes back as `Chlorophyll` where the interface calls that column `chla`. That mapping lives
 in two files in two languages, and when it has drifted the result was never an error: the
-chart just lost its unit, or the parameter could not be plotted at all. This reads both files
-and fails if a word the API can emit stops resolving.
+chart just lost its unit, or the parameter could not be plotted at all. The first check reads
+both files and fails if a word the API can emit stops resolving.
+
+The second runs the query layer against the demo database. A statistic the engine does not
+compute is refused before any SQL is built, a null one is an average, and every word the model
+may use for a measurement must produce a valid query. Each case was a real failure first: a
+crafted operation rewrote the statement, a null one crashed it, and "dissolved oxygen" made
+the profile query invalid.
 
 ## Deploying
 

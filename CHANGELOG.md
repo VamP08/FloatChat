@@ -1,8 +1,23 @@
 # Changelog
 
+## Unreleased
+
+On the live site, not tagged.
+
+- Body text loads Switzer again; Fontshare now serves only the first family of a combined
+  request, so every line of body text had fallen back to the system font.
+- Answers describe a region with its own bounds. The model had only the dataset's overall box
+  and restated it as the Arabian Sea's.
+- The aggregate query refuses a statistic it does not compute before building any SQL, and
+  treats a null one as an average. A crafted operation could rewrite the statement, and a null
+  one crashed it.
+- Profile and time-series queries accept every measurement synonym; multi-word ones such as
+  "dissolved oxygen" made the statement invalid.
+- `check_queries.py` covers all of the above, and runs in CI.
+
 ## 1.0.0 — 2026-09-30
 
-The first release, and the version on the live site.
+The first release.
 
 ### Data
 - `ingest.py` builds the database from the Argo GDAC: 83 floats, 13,026 dives and 1,749,899

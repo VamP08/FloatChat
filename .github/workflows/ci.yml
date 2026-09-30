@@ -34,6 +34,7 @@ jobs:
       # The runtime requirements alone, as the deployed container installs them.
       - run: pip install -r backend/requirements.txt
       - run: python check_parameters.py
+      - run: python check_queries.py
       - name: Serve the demo database and read every endpoint
         run: |
           python -m uvicorn backend.main:app --port 8000 &
