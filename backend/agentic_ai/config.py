@@ -89,6 +89,8 @@ class AgenticConfig:
        enough to one metre of depth to treat them as equivalent. Say which you mean.
     5. Profiles were binned onto standard pressure levels during ingest, so a value at
        a given depth is the mean of the readings within that level.
+    6. A region's extent is the region_bounds the function returns, not the coverage
+       box above. Quote those bounds, or leave the extent out.
     """
 
     @staticmethod

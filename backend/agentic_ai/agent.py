@@ -223,6 +223,12 @@ class OceanographicAgent:
                         "results": entry["results"],
                         "summary": data_summaries[-1] if data_summaries else None,
                     }
+                    # Without the region's own box the model described the Arabian Sea
+                    # with the whole dataset's extent, in every answer.
+                    named = [args.get("region"), *(args.get("regions") or [])]
+                    bounds = {r: self.config.get_region_bounds(r) for r in named if r}
+                    if bounds:
+                        payload["region_bounds"] = bounds
                 except (UnsupportedRegion, UnknownParameter) as e:
                     # Refusals this system raises on purpose. The message names what the
                     # database does hold, which is exactly what the visitor should read.
