@@ -1,5 +1,8 @@
 # FloatChat
 
+[![CI](https://github.com/VamP08/FloatChat/actions/workflows/ci.yml/badge.svg)](https://github.com/VamP08/FloatChat/actions/workflows/ci.yml)
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+
 **[floatchat-live.vercel.app](https://floatchat-live.vercel.app)**
 
 Eighty-three robotic floats have been drifting around the northern Indian Ocean since
@@ -29,6 +32,24 @@ why the query layer works the way it does, and the region list is now an enum th
 rejects before the call is even returned.
 
 ![Asking a question, with the chart behind the answer](assets/ask.png)
+
+### Why not let the model write the SQL
+
+That is the usual shape of a text-to-SQL tool, and it fails quietly. A generated query can
+be valid, run, and answer a different question from the one asked, and nothing downstream
+can tell. Four declared operations cover fewer questions, but each one is a query that has
+been read and tested, the arguments are checked against a schema before anything runs, and
+a region the data does not cover raises an error instead of widening the query.
+
+### Compared with the existing tools
+
+Argo data is already public, and the scientific tools for it are good.
+[argopy](https://github.com/euroargodev/argopy) fetches and filters it from Python, and
+[Argovis](https://argovis.colorado.edu) serves it through an API and a web map. Both are
+built for people who already know what a quality flag is and which variable to request.
+FloatChat is for the question before that: someone who wants to know how salty the Arabian
+Sea is, with the quality control already applied and the answer's chart alongside it. It
+covers one region and 83 floats, which those tools do not limit you to.
 
 ## Quality control, which is the actual problem
 
@@ -83,6 +104,38 @@ pressure levels during ingest, 5 dbar down to 200 m and coarser below, so a stor
 the mean of the readings inside that level rather than a raw reading. And nitrate comes
 back with about a seventh as many values as the other measurements, which is the sensor's
 sampling rate rather than a fault.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    gdac["Argo GDAC<br/>NetCDF files"] -->|"ingest.py: QC, binning"| db[("Postgres on Neon<br/>or the demo SQLite")]
+    db -.->|"tracks.json, written by the same build"| web
+    web["React app<br/>Vercel"] -->|REST| api["FastAPI<br/>Render"]
+    api -->|"templated SQL, bound values"| db
+    api <-->|"question, then one of four functions with typed arguments"| llm["Language model<br/>Groq"]
+```
+
+The landing page draws from `tracks.json` alone, so it paints without the API. The map, the
+float pages and the charts read the API directly; only the chat goes through the model.
+
+## Known limitations
+
+- **One region.** 83 floats in the northern Indian Ocean. Anything else is refused.
+- **A snapshot.** The data runs to September 2026 and is not refreshed on a schedule;
+  rebuilding it is a manual run of `ingest.py`.
+- **Four kinds of question.** Averages and other statistics, trends and anomalies, individual
+  profiles, and comparisons between regions or periods. There is no operation for anything
+  else, such as following one float through time from the chat.
+- **Cold start.** The API sleeps after fifteen idle minutes, and the first request after that
+  takes about half a minute. The landing page does not wait on it.
+- **Twenty questions per five minutes** per address, because each one spends a paid API call.
+- **Averaged depths.** Values are means over standard pressure levels, not raw readings.
+- **The landing animation** redraws only the lit wake around the pointer. Measured at
+  1440×900 on an RTX 4060 laptop it holds 72 fps during a fast sweep and costs nothing at
+  rest; a weaker integrated GPU may drop below 60 while the pointer is moving.
+- **Tests.** CI runs the linter, the build, an API smoke test on the demo database, the
+  parameter check and the QC assertions. There are no browser tests.
 
 ## Running it
 
@@ -179,3 +232,7 @@ the move to Postgres, the interface, and the deployment. Along the way the query
 turned out to answer questions about the Pacific using Indian Ocean measurements, the
 standard deviation branch had never once executed on any input, and every depth chart was
 drawing a flat line across the top of its frame.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
