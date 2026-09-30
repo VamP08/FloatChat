@@ -139,7 +139,7 @@ float pages and the charts read the API directly; only the chat goes through the
 
 ## Running it
 
-Python 3.12 and Node 20.
+Python 3.12 and Node 24.
 
 ```bash
 pip install -r backend/requirements.txt
