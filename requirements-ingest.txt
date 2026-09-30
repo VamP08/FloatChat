@@ -4,3 +4,5 @@ netCDF4==1.7.4
 numpy==2.5.2
 SQLAlchemy==2.0.52
 psycopg[binary]==3.3.5
+# ingest.py imports the schema from backend/, whose package init loads .env.
+python-dotenv==1.2.3
