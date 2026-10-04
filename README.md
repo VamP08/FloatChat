@@ -178,9 +178,11 @@ Every build drops and recreates the schema, so `--demo` always writes the local 
 never inherits `DATABASE_URL`, and rebuilding a populated non-SQLite database needs
 `--replace`.
 
-Load through the direct database endpoint rather than a pooled one. A pooled connection
-does not pipeline, and the same load measured 673 rows per second through it against 1,468
-direct. Keep the pooled endpoint for the deployed API, which is what it is for.
+Load through the direct database endpoint rather than a pooled one: a pooled connection
+does not pipeline. With one row per statement the load measured 673 rows per second through
+the pooler against 1,468 direct; the multi-row statements it uses now reach about 4,500 rows
+per second direct, which is the six minutes above. Keep the pooled endpoint for the deployed
+API, which is what it is for.
 
 A full build also rewrites `frontend/src/data/tracks.json`, which is what the landing page
 draws and counts. That is deliberate: the front page cannot claim more floats than the
