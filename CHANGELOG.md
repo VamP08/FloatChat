@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.2 — 2026-10-04
+
+- The chat's rate limit counts by the address Cloudflare reports. It used the first
+  X-Forwarded-For entry, which Render passes through from the caller, so a client could reset
+  its own limit by changing that header. A ceiling across all callers now sits behind it.
+- Chat requests are bounded: a question up to 2,000 characters, a history up to 20 messages.
+  The panel sends only the question, which is all the API reads. `check_limits.py` checks the
+  limit and the bounds in CI.
+- New logo: favicon set, app icons, web manifest, the mark in the header, the link-preview
+  card and the README.
+- The site links to its source, and the float page's map credits Esri as the main map does.
+- Removed a chart branch no tool could reach, `backend/run.py` and an unused PostCSS plugin.
+
 ## 1.0.1 — 2026-09-30
 
 Fixes found while recording the walkthrough.

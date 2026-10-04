@@ -36,7 +36,7 @@ language model handed those rows writes a confident, fluent, wrong answer. That 
 why the query layer works the way it does, and the region list is now an enum the API
 rejects before the call is even returned.
 
-![Asking a question, with the chart behind the answer](assets/ask.png)
+![Asking a question: the answer arrives with the figure and the number of readings behind it](assets/ask.gif)
 
 ### Why not let the model write the SQL
 
