@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends
 from .. import schemas
 from ..agent_manager import get_agent
 from ..ratelimit import rate_limit
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-def _create_visualization_data(function_results: List[Dict[str, Any]]) -> schemas.VisualizationData:
+def _create_visualization_data(function_results: List[Dict[str, Any]]) -> Optional[schemas.VisualizationData]:
     """
     Create visualization data from function results - generic approach
     """
@@ -37,105 +37,7 @@ def _create_visualization_data(function_results: List[Dict[str, Any]]) -> schema
     elif func_name == 'query_profile_data':
         return _create_profile_visualization(results, params)
     
-    # Fallback: try to create a generic visualization
-    return _create_generic_visualization(results, params)
-
-def _create_generic_visualization(results: List[Dict[str, Any]], params: Dict[str, Any]) -> schemas.VisualizationData:
-    """
-    Create a generic visualization for any type of data
-    """
-    if not results:
-        return None
-    
-    # Analyze the structure of the results to determine best visualization
-    first_result = results[0] if results else {}
-    
-    # If results have time/date information, create a time series
-    if any(key in str(first_result.keys()).lower() for key in ['date', 'time', 'month']):
-        return _create_time_series_visualization(results, params)
-    
-    # If results have numeric values, create a bar chart
-    numeric_fields = [k for k, v in first_result.items() if isinstance(v, (int, float)) and v is not None]
-    if numeric_fields:
-        return _create_numeric_visualization(results, params, numeric_fields)
-    
-    # Fallback to table format
     return _create_table_visualization(results, params)
-
-def _create_time_series_visualization(results: List[Dict[str, Any]], params: Dict[str, Any]) -> schemas.VisualizationData:
-    """Create time series visualization for any temporal data"""
-    if not results:
-        return None
-    
-    chart_data = []
-    for result in results:
-        # Find date/time field
-        date_field = None
-        for key in result.keys():
-            if 'date' in key.lower() or 'time' in key.lower() or 'month' in key.lower():
-                date_field = key
-                break
-        
-        if not date_field:
-            continue
-            
-        # Find numeric fields
-        numeric_data = {}
-        for key, value in result.items():
-            if isinstance(value, (int, float)) and value is not None and key != date_field:
-                numeric_data[key] = value
-        
-        if numeric_data:
-            chart_data.append({
-                'date': result[date_field],
-                **numeric_data
-            })
-    
-    if not chart_data:
-        return None
-    
-    title = "Time Series Data"
-    if params.get('parameters'):
-        title += f" - {', '.join(params['parameters'])}"
-    if params.get('region'):
-        title += f" ({params['region'].title()})"
-    
-    return schemas.VisualizationData(
-        chart_type='line',
-        title=title,
-        data=chart_data,
-        parameters={
-            'x_axis': 'date',
-            'y_axis': list(numeric_data.keys())[0] if numeric_data else 'value'
-        }
-    )
-
-def _create_numeric_visualization(results: List[Dict[str, Any]], params: Dict[str, Any], numeric_fields: List[str]) -> schemas.VisualizationData:
-    """Create bar chart for numeric data"""
-    if not results or not numeric_fields:
-        return None
-    
-    chart_data = []
-    for i, result in enumerate(results):
-        chart_data.append({
-            'index': i,
-            'label': result.get('parameter', result.get('region', f'Item {i+1}')),
-            **{field: result.get(field, 0) for field in numeric_fields}
-        })
-    
-    title = "Data Visualization"
-    if params.get('parameters'):
-        title += f" - {', '.join(params['parameters'])}"
-    
-    return schemas.VisualizationData(
-        chart_type='bar',
-        title=title,
-        data=chart_data,
-        parameters={
-            'x_axis': 'label',
-            'y_axis': numeric_fields[0]
-        }
-    )
 
 def _create_table_visualization(results: List[Dict[str, Any]], params: Dict[str, Any]) -> schemas.VisualizationData:
     """Create table format for complex data"""
@@ -411,7 +313,7 @@ async def handle_chat_message(request: schemas.ChatRequest):
     agent_instance = get_agent()
     
     if not agent_instance:
-        # Fallback to simulated response if agent is not available
+        # No model configured: say so rather than answer.
         return schemas.ChatMessage(
             role="ai",
             content=(
