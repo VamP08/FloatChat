@@ -65,12 +65,8 @@ export default function AskPanel({ open, onClose, initialQuestion }) {
     setIsLoading(true);
 
     try {
-      const reply = await sendChatMessage(
-        history.map((m) => ({
-          role: m.sender === 'ai' ? 'assistant' : 'user',
-          content: m.text,
-        })),
-      );
+      // The API answers the latest question on its own, so that is all it is sent.
+      const reply = await sendChatMessage([{ role: 'user', content: trimmed }]);
       setMessages((prev) => [
         ...prev,
         { id: Date.now() + 1, sender: 'ai', text: reply.content, visualization: reply.visualization },

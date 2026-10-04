@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FloatLocation(BaseModel):
@@ -83,9 +83,10 @@ class VisualizationData(BaseModel):
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: str = Field(max_length=2000)
     visualization: Optional[VisualizationData] = None
 
 
 class ChatRequest(BaseModel):
-    history: List[ChatMessage]
+    # Only the last message is read; the bound stops a request carrying a novel.
+    history: List[ChatMessage] = Field(max_length=20)

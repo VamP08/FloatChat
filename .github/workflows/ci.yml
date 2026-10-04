@@ -32,12 +32,14 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       # The runtime requirements alone, as the deployed container installs them.
-      - run: pip install -r backend/requirements.txt
+      - run: pip install -r backend/requirements.txt ruff
+      - run: ruff check --isolated --select F,E9 .
       - run: python check_parameters.py
       - run: python check_queries.py
       - name: Serve the demo database and read every endpoint
         run: |
-          python -m uvicorn backend.main:app --port 8000 &
+          # No proxy-header rewriting, as in production, where the proxy is not on localhost.
+          python -m uvicorn backend.main:app --port 8000 --no-proxy-headers &
           for i in $(seq 30); do curl -fs localhost:8000/ > /dev/null && break; sleep 1; done
           get() { curl -fsS "localhost:8000$1"; }
           count() { get "$1" | python -c "import json, sys; print(len(json.load(sys.stdin)))"; }
@@ -52,6 +54,7 @@ jobs:
           profile=$(get /floats/$float/profiles | python -c "import json, sys; print(json.load(sys.stdin)[0]['id'])")
           test "$(count /profiles/$profile/measurements)" -gt 0
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/floats/0000000)" = 404
+          python check_limits.py http://127.0.0.1:8000
 
   ingest:
     runs-on: ubuntu-latest

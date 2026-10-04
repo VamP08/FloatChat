@@ -19,33 +19,47 @@ from fastapi import HTTPException, Request
 # scripted loop stops early.
 MAX_REQUESTS = int(os.getenv("CHAT_RATE_LIMIT", "20"))
 WINDOW_SECONDS = int(os.getenv("CHAT_RATE_WINDOW", "300"))
+# Every caller together: a backstop for the quota if addresses ever stop being told apart.
+GLOBAL_MAX = int(os.getenv("CHAT_RATE_LIMIT_GLOBAL", "200"))
 
 _hits: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _client_address(request: Request) -> str:
-    """The caller's address, trusting the proxy header the platform sets.
+    """The caller's address.
 
-    Render and Vercel both terminate TLS upstream, so request.client.host is the proxy
-    rather than the visitor. The first entry of X-Forwarded-For is the original client.
+    Render sits behind Cloudflare, which sets CF-Connecting-IP to the address that
+    connected to it and overwrites any value the client sent. X-Forwarded-For is not
+    used: Render appends to it instead of resetting it, so its first entry is whatever
+    the caller chose to write there. Without the header (local runs) the socket peer is
+    the caller.
     """
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return request.headers.get("cf-connecting-ip") or (
+        request.client.host if request.client else "unknown"
+    )
+
+
+def _limited(key: str, limit: int, now: float) -> int | None:
+    """Seconds to wait if `key` has used its window, else None (and this call counts)."""
+    recent = _hits[key]
+    while recent and now - recent[0] > WINDOW_SECONDS:
+        recent.popleft()
+    if len(recent) >= limit:
+        return int(WINDOW_SECONDS - (now - recent[0])) + 1
+    recent.append(now)
+    return None
 
 
 def rate_limit(request: Request) -> None:
     """Reject a caller that has exceeded the window. Used as a route dependency."""
     now = time.monotonic()
     address = _client_address(request)
-    recent = _hits[address]
-
-    while recent and now - recent[0] > WINDOW_SECONDS:
-        recent.popleft()
-
-    if len(recent) >= MAX_REQUESTS:
-        retry_after = int(WINDOW_SECONDS - (now - recent[0])) + 1
+    retry_after = _limited(address, MAX_REQUESTS, now)
+    if retry_after is None:
+        retry_after = _limited("*", GLOBAL_MAX, now)
+        if retry_after is not None:
+            _hits[address].pop()   # refused for everyone's total, so not counted against this caller
+    if retry_after is not None:
         raise HTTPException(
             status_code=429,
             detail=(
@@ -54,8 +68,6 @@ def rate_limit(request: Request) -> None:
             ),
             headers={"Retry-After": str(retry_after)},
         )
-
-    recent.append(now)
 
     # Addresses that stopped calling would otherwise accumulate forever.
     if len(_hits) > 10_000:
