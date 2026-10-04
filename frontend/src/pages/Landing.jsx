@@ -262,6 +262,11 @@ export default function Landing() {
           Observing System. Profiles here are averaged onto standard pressure levels, so a
           value at a depth is the mean of the readings within that level.
         </p>
+        <p className="mt-4">
+          <a className="underline underline-offset-4 transition-colors hover:text-[var(--ink)]" href="https://github.com/VamP08/FloatChat">
+            Source on GitHub
+          </a>
+        </p>
       </footer>
     </div>
   );

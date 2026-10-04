@@ -59,11 +59,11 @@ function TraceMap({ dives }) {
       boundsOptions={{ padding: [28, 28] }}
       scrollWheelZoom={false}
       zoomControl={false}
-      attributionControl={false}
       style={{ height: '100%', width: '100%', background: 'var(--sea-abyss)' }}
     >
       <TileLayer
         url="https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution='Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Esri, DeLorme, NAVTEQ'
         maxZoom={16}
       />
       <Polyline pathOptions={{ color: '#3dffc0', weight: 9, opacity: 0.12 }} positions={path} />

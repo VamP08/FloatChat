@@ -8,12 +8,14 @@ export default function Header() {
         <img src="/logo.svg" alt="" width="26" height="23" />
         FloatChat
       </Link>
-      <Link
-        to="/"
-        className="text-sm text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)]"
-      >
-        About the data
-      </Link>
+      <nav className="flex gap-6 text-sm text-[var(--ink-dim)]">
+        <Link to="/" className="transition-colors hover:text-[var(--ink)]">
+          About the data
+        </Link>
+        <a className="transition-colors hover:text-[var(--ink)]" href="https://github.com/VamP08/FloatChat">
+          Source
+        </a>
+      </nav>
     </header>
   );
 }
