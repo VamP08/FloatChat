@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#0b3a5b"/>
-  <!-- A temperature profile: warm and near-constant at the surface, falling through
-       the thermocline, near-vertical in the deep. Reads as a shape at 16px. -->
-  <path d="M22 5 V11 Q22 15 13 21 Q10 23 10 27"
-        fill="none" stroke="#5fd0e8" stroke-width="3"
-        stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img"><title>FloatChat</title><rect width="256" height="256" rx="56" fill="#03070c"/><path d="M52 48H204Q220 48 220 64V164Q220 180 204 180H112L76 210V180H52Q36 180 36 164V64Q36 48 52 48Z" fill="#e8f1f5"/><path d="M36 118Q66.666 102 97.333 118Q128.000 134 158.667 118Q189.334 102 220.000 118V164Q220 180 204 180H112L76 210V180H52Q36 180 36 164Z" fill="#3dffc0"/><path d="M36 139.5Q66.666 129.5 97.333 139.5Q128.000 149.5 158.667 139.5Q189.334 129.5 220.000 139.5L220 144.5Q189.334 134.5 158.667 144.5Q128.000 154.5 97.333 144.5Q66.666 134.5 36.000 144.5Z" fill="#2e6a5c"/><path d="M165 108A11 11 0 1 0 187 108A11 11 0 1 0 165 108Z" fill="#03070c"/></svg>

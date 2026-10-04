@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 export default function Header() {
   return (
     <header className="flex shrink-0 items-center justify-between border-b border-[var(--sea-edge)] bg-[var(--sea-abyss)] px-5 py-3">
-      <Link to="/" className="display text-lg tracking-tight text-[var(--ink)]">
+      <Link to="/" className="display flex items-center gap-2.5 text-lg tracking-tight text-[var(--ink)]">
+        <img src="/logo.svg" alt="" width="26" height="23" />
         FloatChat
       </Link>
       <Link

@@ -50,7 +50,10 @@ export default function Landing() {
 
         <div className="pointer-events-none relative flex min-h-screen flex-col px-6 py-7 sm:px-10 lg:px-16">
           <header className="pointer-events-auto flex items-center justify-between">
-            <span className="display text-xl tracking-tight">FloatChat</span>
+            <span className="display flex items-center gap-3 text-xl tracking-tight">
+              <img src="/logo.svg" alt="" width="30" height="26" />
+              FloatChat
+            </span>
             <nav className="flex gap-7 text-sm text-[var(--ink-dim)]">
               <a className="transition-colors hover:text-[var(--ink)]" href="/floats">Map</a>
               <a className="transition-colors hover:text-[var(--ink)]" href="/floats">Floats</a>

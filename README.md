@@ -1,4 +1,9 @@
-# FloatChat
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-lockup-dark.svg">
+    <img alt="FloatChat" src="assets/logo-lockup.svg" height="64">
+  </picture>
+</h1>
 
 [![CI](https://github.com/VamP08/FloatChat/actions/workflows/ci.yml/badge.svg)](https://github.com/VamP08/FloatChat/actions/workflows/ci.yml)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
